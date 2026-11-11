@@ -13,6 +13,12 @@ env.Append(ASFLAGS=['-Wa,-I' + str(root / 'esp32s3/src')])
 database = root / 'esp32s3/.pio/build/esp32s3-skeleton/compile_commands.json'
 entries = json.loads(database.read_text(encoding='utf-8'))
 objects = []
+no_movie_recording = env.GetProjectOption('custom_mame_movie_recording', 'no').lower() in ('no', 'false', '0')
+movie_overlay = root / 'esp32s3/components/mame0220/generated/video_nomovie_s3.cpp'
+if no_movie_recording:
+    subprocess.run([sys.executable, str(root / 'tools/prepare_no_movie_recording.py'),
+        str(root / 'ref/mame0220-src/src/emu/video.cpp'), str(movie_overlay)], check=True)
+movie_selected = 0
 no_external_media = env.GetProjectOption('custom_mame_external_media', 'no').lower() in ('no', 'false', '0')
 media_sources = {
     'romload.cpp': ('rom', 'romload_nomedia_s3.cpp'),
@@ -57,6 +63,10 @@ for entry in entries:
     if not any(part in normalized for part in ('/components/mame0220/', '/ref/mame0220-src/', '/integration/chessengine/src/')):
         continue
     tokens = shlex.split(entry['command'])
+    if source.name in ('video.cpp', 'video_nomovie_s3.cpp'):
+        source = movie_overlay if no_movie_recording else root / 'ref/mame0220-src/src/emu/video.cpp'
+        normalized = source.as_posix()
+        movie_selected += 1
     for original, (_, overlay) in text_sources.items():
         if source.name in (original, overlay) or (original == 'softlist_dev.cpp' and source.name == 'softlist_dev_nomedia_s3.cpp'):
             source = (root / 'esp32s3/components/mame0220/generated' / overlay) if no_desktop_text else (root / 'ref/mame0220-src/src/emu' / original)
@@ -118,6 +128,7 @@ assert len(objects) > 100, 'Missing MAME compilation manifest'
 assert memory_sources == 1, 'Expected exactly one owning MAME memory source'
 assert text_selected == 2, 'Expected exactly two desktop-text profile sources'
 assert media_selected == 3, 'Expected exactly three external-media profile sources'
+assert movie_selected == 1, 'Expected exactly one movie-recording profile source'
 library = env.StaticLibrary('$BUILD_DIR/mame0220', objects)
 env.Append(LIBS=[library], LINKFLAGS=['-Wl,--wrap=__cxa_throw', '-frtti'])
 print('Common-SDK MAME build:', len(objects), 'sources;', len(groups), 'compile profiles')

@@ -286,6 +286,19 @@ if(MAME_S3_NO_EXTERNAL_MEDIA)
         endif()
     endforeach()
 endif()
+option(MAME_S3_NO_MOVIE_RECORDING "Omit AVI/MNG movie recording" ON)
+set(MAME_VIDEO_SOURCE "${MAME_EMU_ROOT}/video.cpp")
+if(MAME_S3_NO_MOVIE_RECORDING)
+    find_program(MAME_MOVIE_PYTHON NAMES python python3 REQUIRED)
+    set(MAME_VIDEO_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/video_nomovie_s3.cpp")
+    execute_process(COMMAND "${MAME_MOVIE_PYTHON}"
+        "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_no_movie_recording.py"
+        "${MAME_ROOT}/src/emu/video.cpp" "${MAME_VIDEO_SOURCE}"
+        RESULT_VARIABLE MAME_MOVIE_RESULT)
+    if(NOT MAME_MOVIE_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to prepare movie-recording overlay")
+    endif()
+endif()
 set(MAME_EMU_SRC
     # -- Geraetebasis und Schnittstellen -------------------------------------
     "${MAME_EMU_ROOT}/device.cpp"
@@ -408,7 +421,7 @@ if(MAME_S3_NO_DEBUG_COMMANDS)
     endif()
 endif()
 set(MAME_EMU_M1B_SRC
-    "${MAME_EMU_ROOT}/video.cpp"
+    "${MAME_VIDEO_SOURCE}"
     "${MAME_EMU_ROOT}/screen.cpp"
     "${MAME_EMU_ROOT}/render.cpp"
     "${MAME_EMU_ROOT}/rendfont.cpp"
