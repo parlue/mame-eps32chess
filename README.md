@@ -5,11 +5,11 @@ Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 
 
 ## Verified development snapshot - 11 November 2026
 
-- Combined Build 38 adopts the bounded IRAM CPU profile, with the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
+- Combined Build 45 combines the bounded IRAM CPU profile with reduced sample generation for discarded DAC audio, with the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
 - Actual MM IV ROM response: e2e4 -> e7e5. Actual MM V ROM opening: d2d4.
 - The device regression passed clean result-0 exits, intact heaps, return to Virginia, launcher gestures and all 215 Bot portrait decodes.
-- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. The IRAM profile passed an injected-gesture frontend/ROM regression and two sustained middlegame runs in Build 37. This is not a new physical acceptance test.
-- Full application: **5,004,143 bytes**; static internal RAM: **154,628 bytes**. Qualified RAM/ROM pages use a 6,168-byte PSRAM helper; I/O and mapping changes retain the MAME fallback.
+- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. The current default passed the injected-gesture frontend/ROM regression and two sustained middlegame runs in Build 44, with an exact default-application hash verified in Build 45. This is not a new physical acceptance test.
+- Full application: **5,005,703 bytes**; static internal RAM: **154,636 bytes**. Qualified RAM/ROM pages use a 6,168-byte PSRAM helper; I/O and mapping changes retain the MAME fallback.
 - Build 27's repeated short opening tests reported **26.45-26.53% original speed for MM IV** and **29.40-29.44% for MM V**, approximately **23-27% faster** than Build 24. CPU-only unity compilation and skipping unconnected SYNC callbacks provide this gain. Startup memory/read/write/tap and empty/connected callback validation pass.
 - Build 28 keeps that CPU/clock/profile code unchanged and adds a sustained middlegame reference: **MM IV 19.79%** in a closed Spanish centre and **MM V 20.67%** in a Dragon attack, each measured during a 180-wall-second search phase after replaying 32 plies. UCI/Lua polling takes a median **25.3% / 26.6% of wall time** in these windows. These are different workloads from the opening tests, not an additional optimization or a same-position comparison between ROMs. No bestmove completed at level le 9 within either window. These Build 28 values are the pre-cache reference.
 
@@ -17,6 +17,7 @@ Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 
 - Build 30's optional startup-only RAM/ROM probe compares access layers with matching checksums on both ROMs. Build 31 ships with that probe disabled, identical generated CPU source and application size to Build 29. The measurements and compiler assembly identify the remaining indirect fetch path as an A/B-test candidate; no additional search-speed gain is claimed.
 - Direct CPU access experiments in Builds 32/33 did not improve sustained speed. The compact version reached **MM IV 24.29% / MM V 25.70%**, about 2% below the previous matched runs. It remains opt-in; normal Build 34 has the exact stable Build-31 application hash. The compact candidate's frontend/ROM regression and both sustained searches passed. See the [experiment and limits](docs/33_direct_cpu_memory.md).
 - Build 37 places 16 common instruction routines plus prefetch in internal instruction RAM. The same counter-free sustained middlegames reach **MM IV 26.52% / MM V 28.01%**, **7.1% / 6.8% faster** than Build 29. Extra shared SRAM cost is **2,816 bytes**; app growth is 232 bytes. This is the adopted combined profile, default in Build 38; set `BAUERINO_MAME_HOT_ROUTINES=0` for the former CPU. The original clocks remain unchanged. [Counts, placement checks and limits](docs/34_opcode_hot_routines.md).
+- Core timing in Build 41 attributes **13.50% / 14.35%** of search wall time to sound updates. Skipping final stereo conversion alone produced no meaningful gain in Build 42 and remains optional. Build 44 instead requests 11,025 Hz for the discarded 192-kHz DAC stream through MAME's own API: **MM IV 30.19% / MM V 32.11% original speed**, **13.82% / 14.62% faster** than the immediate IRAM baseline. CPU clocks, timer periods and digital DAC writes are unchanged; audible/recording machines keep the original rate. Extra SRAM is **8 bytes**. This is adopted in default Build 45; `BAUERINO_MAME_QUIET_DAC=0` restores the old sample rate. The 50% target remains unmet. [Qualification and limits](docs/37_quiet_dac_stream.md).
 
 Retro currently provides a limited ROM-test workflow: Load, dynamic UCI Options, Board, Notation, Move and Quit. Full physical-board gameplay through native Retro, additional CPU families and deferred Analyse/Setup features remain future work.
 
@@ -67,6 +68,8 @@ This is the tested development source snapshot. The combined build still uses th
 - [Direct CPU access experiments](docs/33_direct_cpu_memory.md)
 - [Opcode frequencies and bounded IRAM placement](docs/34_opcode_hot_routines.md)
 - [Bounded inline memory experiment](docs/35_hot_direct_memory.md): +1.07% / +1.20% in single matched runs, at 1,040 extra SRAM bytes. Kept opt-in; Build 40 restored the exact adopted IRAM application and passed the device regression again.
+- [Exclusive core timing and final conversion experiment](docs/36_core_profile_discarded_mix.md)
+- [Adopted quiet DAC stream profile](docs/37_quiet_dac_stream.md)
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.

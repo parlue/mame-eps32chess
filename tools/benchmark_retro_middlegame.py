@@ -16,7 +16,10 @@ p.add_argument('--level',default='le 9')
 p.add_argument('--port',default='COM8')
 p.add_argument('--output',type=Path,required=True)
 p.add_argument('--expect-opcode-profile',action='store_true',help='Require diagnostic histograms; resulting speed is instrumented and not comparable')
+p.add_argument('--expect-core-profile',action='store_true',help='Require diagnostic nested core scopes; resulting speed is not a candidate speed measurement')
+p.add_argument('--expect-quiet-dac',action='store_true',help='Require 11025-Hz discarded DAC audio and the original MM IV/V CPU clock/update period')
 a=p.parse_args()
+assert not (a.expect_opcode_profile and a.expect_core_profile), 'Use one diagnostic at a time'
 if a.seconds<60:p.error('Use at least 60 wall seconds')
 if not re.fullmatch(r'(le [0-9]|bl [1-8])',a.level):p.error('Invalid device level')
 root=Path(__file__).resolve().parents[1]
@@ -83,6 +86,11 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         send('x'*1030+'tap 100 320');wait(r'^\[DIAGNOSTIC\] rejected: input line too long$')
         tap(100,320);tap(300,340);tap(240,150 if a.driver=='mm4' else 250)
         loaded=True;wait(r'^\[RETRO OPEN\] '+a.driver);wait(r'^\[RETRO UCI\] readyok$')
+        if a.expect_quiet_dac:
+            startup = '\n'.join(s for _,s in events)
+            rate = re.search(r'\[MAME QUIET DAC\] original=192000 requested=11025 cpu_clock=(\d+) timer_attoseconds=(\d+)', startup)
+            before = re.search(r'\[MAME PRE-DEVICE\] sample_rate=11025 update_attoseconds=(\d+)', startup)
+            assert rate and before and int(rate[1]) == 4915200 and rate[2] == before[1], 'Quiet DAC changed/missed the original CPU clock or sound-update period'
         uci('setoption name Speed value 0');uci('setoption name Level value '+a.level)
         uci('ucinewgame');ready_index=uci('isready');wait_since(r'^\[RETRO UCI\] readyok$',ready_index,180)
         record('[BENCH] replay_begin plies='+str(position['plies']))
@@ -115,11 +123,14 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         assert len(windows)>=8,'Search ended too early for a sustained measurement'
         has_opcode_profile=any('[MAME OPCODE TOTAL]' in s for t,s in events if search+10<=t<=end)
         assert has_opcode_profile==a.expect_opcode_profile, 'Opcode instrumentation does not match requested measurement kind'
+        has_core_profile=any('[MAME CORE]' in s for t,s in events if search+10<=t<=end)
+        assert has_core_profile==a.expect_core_profile, 'Core instrumentation does not match requested measurement kind'
         quit_index=uci('quit');wait_since(r'^\[RETRO\] exit 0; integrity=OK',quit_index,90);loaded=False
         tap(30,25)
         elapsed=sum(w['real'] for w in windows);emulated=sum(w['emu'] for w in windows)
         evidence={'driver':a.driver,'case':a.case,'level':a.level,'position':position,
-            'measurement_kind':'instrumented-opcode-profile' if a.expect_opcode_profile else 'sustained-speed',
+            'measurement_kind':'instrumented-core-profile' if a.expect_core_profile else ('instrumented-opcode-profile' if a.expect_opcode_profile else 'sustained-speed'),
+            'quiet_dac_contract_verified':a.expect_quiet_dac,
             'search_wall_seconds':round(end-search,3),'bestmove':reply,'search_windows':windows,
             'measured_wall_seconds':elapsed,'measured_emulated_seconds':emulated,
             'weighted_original_speed_percent':100*emulated/elapsed,

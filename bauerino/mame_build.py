@@ -20,7 +20,17 @@ direct_memory = os.environ.get('BAUERINO_MAME_DIRECT_MEMORY') == '1'
 hot_direct = os.environ.get('BAUERINO_MAME_HOT_DIRECT') == '1'
 memory_probe = os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1'
 opcode_profile = os.environ.get('BAUERINO_MAME_OPCODE_PROFILE') == '1'
+core_profile = os.environ.get('BAUERINO_MAME_CORE_PROFILE') == '1'
+discard_mix = os.environ.get('BAUERINO_MAME_DISCARD_MIX') == '1'
+# The discarded-audio profile retains the original ROM clocks and timers.
+# Explicit 0 restores the original DAC sample rate for controlled comparisons.
+quiet_dac = os.environ.get('BAUERINO_MAME_QUIET_DAC', '1') == '1'
+assert not core_profile or not (direct_memory or hot_direct or memory_probe or opcode_profile), 'Measure the adopted CPU profile separately'
 cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
+assert not core_profile or cpu_unity, 'Core diagnostic qualified only with CPU unity'
+core_selected = set()
+discard_mix_selected = 0
+quiet_dac_selected = 0
 # The qualified combined profile uses bounded IRAM by default. Diagnostic and
 # non-unity comparisons retain their original CPU unless explicitly requested.
 hot_default = cpu_unity and not (direct_memory or memory_probe or opcode_profile)
@@ -34,6 +44,11 @@ subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
     + (['--hot-direct'] if hot_direct else [])
     + (['--direct-memory'] if direct_memory else []), check=True)
 speed_selected = 0
+cpu_source = speed_overlay
+if core_profile:
+    cpu_source = speed_overlay.with_name('m6502_core_profile_s3.cpp')
+    subprocess.run([sys.executable, str(root / 'tools/prepare_core_profile.py'),
+        str(speed_overlay), str(cpu_source), 'cpu'], check=True)
 unity_overlay = speed_base.with_name('m6502_unity_s3.cpp')
 cmos_selected = 0
 assert not direct_memory or cpu_unity, 'Direct-memory experiment requires the CPU unity translation unit'
@@ -46,7 +61,7 @@ if cpu_unity:
     assert len(cpu_entries) == 2, 'Expected two CPU manifest entries before unity selection'
     profiles = [[t for t in shlex.split(e['command']) if t.startswith(('-I', '-D'))] for e in cpu_entries]
     assert profiles[0] == profiles[1], 'CPU unity requires identical include/define profiles'
-    subprocess.run([sys.executable, str(root / 'tools/prepare_cpu_unity.py'), str(speed_overlay),
+    subprocess.run([sys.executable, str(root / 'tools/prepare_cpu_unity.py'), str(cpu_source),
         str(cmos_source), str(unity_overlay)], check=True)
 driver_overlay = root / 'esp32s3/components/mame0220/generated/mephisto_internal_s3.cpp'
 subprocess.run([sys.executable, str(root / 'tools/prepare_mephisto_internal_cpu.py'),
@@ -111,7 +126,7 @@ for entry in entries:
         normalized = source.as_posix()
         driver_selected += 1
     if source.name in ('m6502_s3.cpp', 'm6502_speed_s3.cpp'):
-        source = unity_overlay if cpu_unity else speed_overlay
+        source = unity_overlay if cpu_unity else cpu_source
         normalized = source.as_posix()
         speed_selected += 1
     if source.name in ('video.cpp', 'video_nomovie_s3.cpp'):
@@ -140,6 +155,32 @@ for entry in entries:
     if source.name in ('debugcmd.cpp', 'debugcmd_s3.cpp'):
         source = debug_overlay if no_debug_commands else root / 'ref/mame0220-src/src/emu/debug/debugcmd.cpp'
         normalized = source.as_posix()
+    if quiet_dac and source.name == 's3_startup.cpp':
+        diagnostic = speed_base.with_name('startup_quiet_dac_s3.cpp')
+        subprocess.run([sys.executable, str(root / 'tools/prepare_quiet_dac.py'),
+            str(source), str(diagnostic)], check=True)
+        source = diagnostic
+        normalized = source.as_posix()
+        quiet_dac_selected += 1
+    if discard_mix and source.name == 'sound.cpp':
+        diagnostic = speed_base.with_name('sound_discard_mix_s3.cpp')
+        subprocess.run([sys.executable, str(root / 'tools/prepare_discard_mix.py'),
+            str(source), str(diagnostic)], check=True)
+        source = diagnostic
+        normalized = source.as_posix()
+        discard_mix_selected += 1
+    if core_profile:
+        kind = {'schedule.cpp': 'schedule', 'video.cpp': 'video',
+                'video_nomovie_s3.cpp': 'video', 'ioport.cpp': 'ioport',
+                'sound.cpp': 'sound', 'sound_discard_mix_s3.cpp': 'sound', 's3_osd.cpp': 'osd'}.get(source.name)
+        if kind:
+            assert kind not in core_selected, 'Duplicate core diagnostic source'
+            core_selected.add(kind)
+            diagnostic = speed_base.with_name(kind + '_core_profile_s3.cpp')
+            subprocess.run([sys.executable, str(root / 'tools/prepare_core_profile.py'),
+                str(source), str(diagnostic), kind], check=True)
+            source = diagnostic
+            normalized = source.as_posix()
     includes = []
     definitions = []
     for token in tokens:
@@ -191,6 +232,9 @@ assert movie_selected == 1, 'Expected exactly one movie-recording profile source
 assert speed_selected == 1, 'Expected exactly one owning 6502 speed source'
 assert cmos_selected == 1, 'Expected exactly one 65C02 source before unity selection'
 assert driver_selected == 1, 'Expected exactly one Mephisto allocation source'
+assert not core_profile or core_selected == {'schedule', 'video', 'ioport', 'sound', 'osd'}, 'Missing diagnostic scope source'
+assert discard_mix_selected == int(discard_mix), 'Missing/duplicate discarded-mix source'
+assert quiet_dac_selected == int(quiet_dac), 'Missing/duplicate quiet-DAC source'
 library = env.StaticLibrary('$BUILD_DIR/mame0220', objects)
 env.Append(LIBS=[library], LINKFLAGS=['-Wl,--wrap=__cxa_throw', '-frtti'])
 print('Common-SDK MAME build:', len(objects), 'sources;', len(groups), 'compile profiles')
