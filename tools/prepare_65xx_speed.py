@@ -4,7 +4,7 @@ from pathlib import Path
 from prepare_no_desktop_text import replace_body
 
 
-def prepare(source, destination, memory_probe=False, direct_memory=False):
+def prepare(source, destination, memory_probe=False, direct_memory=False, opcode_profile=False, hot_routines=False):
     text = source.read_text(encoding='utf-8')
     assert source.resolve() != destination.resolve()
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
@@ -123,9 +123,30 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
     std::printf("[MAME CPU MEMORY] cpu=%p bytes=%u interface=%p cache=%p scache=%p cache_bytes=%u cached=%d\\n",
         this, unsigned(sizeof(*this)), mintf.get(), mintf->cache, mintf->scache,
         unsigned(sizeof(*mintf->cache)), int(s3_speed_mode.load() & 1));''')
+    if opcode_profile:
+        marker = '#include <atomic>'
+        text = text.replace(marker, marker + '\n#include "../src/s3_opcode_profile.h"')
+        marker = '    s3_cpu_us = 0; s3_cpu_calls = s3_cpu_cycles = 0;'
+        assert text.count(marker) == 2
+        # One in the periodic reporter and one in CPU initialization.
+        text = text.replace(marker, '    s3_opcode_report();\n' + marker, 1)
+        index = text.index(marker, text.index('void m6502_device::init()'))
+        text = text[:index] + '    s3_opcode_reset();\n' + text[index:]
+        start = text.index('void m6502_device::execute_run()')
+        end = text.index('void m6502_device::execute_set_input', start)
+        body = text[start:end]
+        assert body.count('if(inst_substate)\n\t\tdo_exec_partial();') == 1
+        assert body.count('\t\tdo_exec_full();') == 1
+        body = body.replace('if(inst_substate)\n\t\tdo_exec_partial();',
+            'if(inst_substate) {\n\t\t++s3_opcode_partial;\n\t\tdo_exec_partial();\n\t}')
+        body = body.replace('\t\tdo_exec_full();', '\t\ts3_opcode_begin(inst_state);\n\t\tdo_exec_full();')
+        text = text[:start] + body + text[end:]
     if direct_memory:
         from prepare_direct_memory import prepare as prepare_direct
         text = prepare_direct(text, destination)
+    if hot_routines:
+        from prepare_hot_routines import prepare as prepare_hot
+        text = prepare_hot(text, destination)
     if memory_probe:
         anchor = '#include <atomic>'
         text = text.replace(anchor, anchor + '\n#include "../src/s3_memory_probe.h"')
@@ -144,6 +165,8 @@ if __name__ == '__main__':
     parser.add_argument('destination', type=Path)
     parser.add_argument('--memory-probe', action='store_true', help='Bounded startup-only RAM/ROM access comparison')
     parser.add_argument('--direct-memory', action='store_true', help='Qualified CPU accesses without virtual interface dispatch')
+    parser.add_argument('--opcode-profile', action='store_true', help='Diagnostic instruction-start histogram, not speed measurements')
+    parser.add_argument('--hot-routines', action='store_true', help='Explicitly selected CPU routine placement in internal instruction RAM')
     args = parser.parse_args()
-    assert not (args.memory_probe and args.direct_memory), 'Run these comparison profiles separately'
-    prepare(args.source, args.destination, args.memory_probe, args.direct_memory)
+    assert sum((args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines)) <= 1, 'Run these comparison profiles separately'
+    prepare(args.source, args.destination, args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines)

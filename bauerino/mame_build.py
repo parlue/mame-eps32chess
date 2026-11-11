@@ -17,16 +17,27 @@ objects = []
 speed_base = root / 'esp32s3/components/mame0220/generated/m6502_s3.cpp'
 speed_overlay = speed_base.with_name('m6502_speed_s3.cpp')
 direct_memory = os.environ.get('BAUERINO_MAME_DIRECT_MEMORY') == '1'
+memory_probe = os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1'
+opcode_profile = os.environ.get('BAUERINO_MAME_OPCODE_PROFILE') == '1'
+cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
+# The qualified combined profile uses bounded IRAM by default. Diagnostic and
+# non-unity comparisons retain their original CPU unless explicitly requested.
+hot_default = cpu_unity and not (direct_memory or memory_probe or opcode_profile)
+hot_routines = os.environ.get('BAUERINO_MAME_HOT_ROUTINES', '1' if hot_default else '0') == '1'
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
     str(speed_base), str(speed_overlay)]
-    + (['--memory-probe'] if os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1' else [])
+    + (['--memory-probe'] if memory_probe else [])
+    + (['--opcode-profile'] if opcode_profile else [])
+    + (['--hot-routines'] if hot_routines else [])
     + (['--direct-memory'] if direct_memory else []), check=True)
 speed_selected = 0
-cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
 unity_overlay = speed_base.with_name('m6502_unity_s3.cpp')
 cmos_selected = 0
 assert not direct_memory or cpu_unity, 'Direct-memory experiment requires the CPU unity translation unit'
+assert not hot_routines or cpu_unity, 'Hot-routine experiment requires the CPU unity translation unit'
 cmos_source = speed_base.with_name('m65c02_direct_s3.cpp') if direct_memory else root / 'ref/mame0220-src/src/devices/cpu/m6502/m65c02.cpp'
+if hot_routines:
+    cmos_source = speed_base.with_name('m65c02_hot_s3.cpp')
 if cpu_unity:
     cpu_entries = [e for e in entries if Path(e['file']).name in ('m6502_s3.cpp', 'm6502_speed_s3.cpp', 'm65c02.cpp')]
     assert len(cpu_entries) == 2, 'Expected two CPU manifest entries before unity selection'

@@ -1,0 +1,29 @@
+{
+  "description": "Bounded IRAM experiment selected from exact MM IV Spanish-centre full-dispatch frequencies; MM V coverage and both counter-free speeds must be verified. Frequency does not measure routine wall time.",
+  "routines": [
+    "m6502_device::prefetch",
+    "m6502_device::bmi_rel_full",
+    "m6502_device::beq_rel_full",
+    "m6502_device::lda_abx_full",
+    "m6502_device::iny_imp_full",
+    "m6502_device::cmp_zpg_full",
+    "m6502_device::lda_idy_full",
+    "m6502_device::sta_zpg_full",
+    "m6502_device::sty_zpg_full",
+    "m6502_device::ldy_abx_full",
+    "m6502_device::bne_rel_full",
+    "m6502_device::lda_zpg_full",
+    "m6502_device::lda_zpx_full",
+    "m65c02_device::inc_c_zpg_full",
+    "m6502_device::ldy_zpg_full",
+    "m6502_device::lda_aby_full",
+    "m6502_device::jmp_adr_full"
+  ],
+  "extra_iram_budget_bytes": 4096,
+  "planned_function_text_bytes": 2983,
+  "baseline_application_sha256": "4cd4dae17bf4ef02d6c00dd56d5abd97f0821a194e7e2cc29d03995c4e188b96",
+  "selection_driver": "mm4",
+  "selection_case": "spanish-centre",
+  "profile_full_instruction_starts": 26379339,
+  "selected_mm4_instruction_start_percent": 71.96190928059268
+}
