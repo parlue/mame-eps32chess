@@ -10,6 +10,9 @@ p.add_argument('--output',type=Path,required=True)
 p.add_argument('--boot-only',action='store_true')
 p.add_argument('--skip-intro-capture',action='store_true')
 p.add_argument('--no-captures',action='store_true')
+p.add_argument('--cache-mode',type=int,choices=[0,1],help='Select 6502 data access before loading a ROM')
+p.add_argument('--speed-mode',type=int,choices=[0,1,2,3],help='Bit 0: cached data; bit 1: internal Mephisto CPU')
+p.add_argument('--http-during-rom',action='store_true',help='Exercise portal HTTP while the MM V worker is alive')
 a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
 device=next((d for d in list_ports.comports() if d.device==a.port),None)
 assert device and device.vid==0x303a and device.pid==0x1001 and (device.serial_number or '').replace(':','').upper()=='44BD8D60CB44'
@@ -63,10 +66,17 @@ with usb,(a.output/'device.log').open('w',encoding='utf-8') as log:
         assert len(buffer)>=460800,'Incomplete frontend capture'
         raw=bytes(buffer[:460800]);del buffer[:460800]
         png(a.output/(name+'.png'),raw);wait(r'^\[LCD FRAME END\]',30);captures.append(name+'.png')
+    usb.reset_input_buffer()
     usb.dtr=False;usb.rts=True;time.sleep(.1);usb.rts=False
+    # Ignore a previous boot's partial tail when attaching just after a flash.
+    wait(r'^ESP-ROM:esp32s3-',60)
     wait(r'^\[START\] setup done',60)
     assert any('[START] Bauerino display=1' in s for s in lines),'Display init failed'
     assert any('[START] AP=1' in s for s in lines),'Wi-Fi AP failed'
+    if a.cache_mode is not None:
+        send('mame-cache '+str(a.cache_mode));wait(r'^\[MAME CACHE\] enabled='+str(a.cache_mode),30)
+    if a.speed_mode is not None:
+        send('mame-speed '+str(a.speed_mode));wait(r'^\[MAME SPEED\] mode='+str(a.speed_mode),30)
     if a.skip_intro_capture:time.sleep(20)
     else:capture('00-start-animation');time.sleep(3.5)
     capture('01-app-menu')
@@ -92,6 +102,11 @@ with usb,(a.output/'device.log').open('w',encoding='utf-8') as log:
     tap(300,340);tap(240,250);wait(r'^\[RETRO OPEN\] mm5');wait(r'^\[RETRO UCI\] readyok$')
     tap(60,410);tap(350,180)
     move2=wait(r'^\[RETRO UCI\] bestmove [a-h][1-8][a-h][1-8]');capture('18-mm5-white-opening')
+    if a.http_during_rom:
+        send('http-test')
+        wait(r'^\[HTTP TEST\] /unknown-portal-probe received=\d+ bytes',90)
+        for path in ['/', '/api/state', '/generate_204', '/hotspot-detect.html', '/connecttest.txt', '/unknown-portal-probe']:
+            assert any('[HTTP TEST] '+path+' -> HTTP/1.1 ' in s and (' 200 ' in s or ' 302 ' in s) for s in lines), 'HTTP failure: '+path
     tap(30,25);wait(r'^\[RETRO\] exit 0; integrity=OK');time.sleep(.3);capture('19-return-home')
     tap(100,140);capture('20-virginia-after-retro')
     record('PASS: original launcher/Virginia/Bots/gestures, real MM IV/MM V ROM/UCI controls, clean task exits and return to original frontend')

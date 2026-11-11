@@ -33,6 +33,7 @@
 #include "esp_heap_caps.h"
 
 #include <cstdio>
+extern "C" void s3_m6502_profile_report(int64_t elapsed) __attribute__((weak));
 
 //--------------------------------------------------------------------------
 // allgemeine Haken
@@ -109,6 +110,7 @@ void s3_osd::update(bool skip_redraw)
 	++m_profile_frames;
 	if (profile_end - m_profile_wall >= 5000000) {
 		const double elapsed = double(profile_end - m_profile_wall);
+		if (s3_m6502_profile_report) s3_m6502_profile_report(profile_end - m_profile_wall);
 		// Wall time, not sampled CPU time: mutex waits and preemption belong
 		// to their measured section. Outside-OSD includes emulation, core video,
 		// scheduler and other work; do not label it CPU execution time.

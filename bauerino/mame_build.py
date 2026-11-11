@@ -13,6 +13,15 @@ env.Append(ASFLAGS=['-Wa,-I' + str(root / 'esp32s3/src')])
 database = root / 'esp32s3/.pio/build/esp32s3-skeleton/compile_commands.json'
 entries = json.loads(database.read_text(encoding='utf-8'))
 objects = []
+speed_base = root / 'esp32s3/components/mame0220/generated/m6502_s3.cpp'
+speed_overlay = speed_base.with_name('m6502_speed_s3.cpp')
+subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
+    str(speed_base), str(speed_overlay)], check=True)
+speed_selected = 0
+driver_overlay = root / 'esp32s3/components/mame0220/generated/mephisto_internal_s3.cpp'
+subprocess.run([sys.executable, str(root / 'tools/prepare_mephisto_internal_cpu.py'),
+    str(root / 'ref/mame0220-src/src/mame/drivers/mephisto_mm2.cpp'), str(driver_overlay)], check=True)
+driver_selected = 0
 no_movie_recording = env.GetProjectOption('custom_mame_movie_recording', 'no').lower() in ('no', 'false', '0')
 movie_overlay = root / 'esp32s3/components/mame0220/generated/video_nomovie_s3.cpp'
 if no_movie_recording:
@@ -63,6 +72,14 @@ for entry in entries:
     if not any(part in normalized for part in ('/components/mame0220/', '/ref/mame0220-src/', '/integration/chessengine/src/')):
         continue
     tokens = shlex.split(entry['command'])
+    if source.name in ('mephisto_mm2.cpp', 'mephisto_internal_s3.cpp'):
+        source = driver_overlay
+        normalized = source.as_posix()
+        driver_selected += 1
+    if source.name in ('m6502_s3.cpp', 'm6502_speed_s3.cpp'):
+        source = speed_overlay
+        normalized = source.as_posix()
+        speed_selected += 1
     if source.name in ('video.cpp', 'video_nomovie_s3.cpp'):
         source = movie_overlay if no_movie_recording else root / 'ref/mame0220-src/src/emu/video.cpp'
         normalized = source.as_posix()
@@ -121,6 +138,12 @@ for entry in entries:
         core.Append(CXXFLAGS=['-std=gnu++17', '-frtti', '-fexceptions'])
         groups[signature] = core
     core = groups[signature]
+    # Speed experiment limited to the two CPU interpreters. Preserve the
+    # delegate identity fix even when selecting a different optimization level.
+    if source.name in ('m6502_speed_s3.cpp', 'm65c02.cpp'):
+        core = core.Clone()
+        core.ProcessUnFlags('-Os -O1 -O2 -O3 -fno-jump-tables -fno-tree-switch-conversion')
+        core.Append(CCFLAGS=['-O2', '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
     key = hashlib.sha256(normalized.encode()).hexdigest()[:12]
     objects.extend(core.Object(str(Path(env.subst('$BUILD_DIR')) / 'mame' / (source.stem + '-' + key)), str(source)))
 
@@ -129,6 +152,8 @@ assert memory_sources == 1, 'Expected exactly one owning MAME memory source'
 assert text_selected == 2, 'Expected exactly two desktop-text profile sources'
 assert media_selected == 3, 'Expected exactly three external-media profile sources'
 assert movie_selected == 1, 'Expected exactly one movie-recording profile source'
+assert speed_selected == 1, 'Expected exactly one owning 6502 speed source'
+assert driver_selected == 1, 'Expected exactly one Mephisto allocation source'
 library = env.StaticLibrary('$BUILD_DIR/mame0220', objects)
 env.Append(LIBS=[library], LINKFLAGS=['-Wl,--wrap=__cxa_throw', '-frtti'])
 print('Common-SDK MAME build:', len(objects), 'sources;', len(groups), 'compile profiles')

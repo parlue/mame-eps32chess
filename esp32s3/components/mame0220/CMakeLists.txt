@@ -104,6 +104,24 @@ endif()
 if(NOT MAME_6502_PREVIOUS STREQUAL MAME_6502_SOURCE)
     file(WRITE "${MAME_6502_OVERLAY}" "${MAME_6502_SOURCE}")
 endif()
+find_program(MAME_SPEED_PYTHON NAMES python python3 REQUIRED)
+set(MAME_6502_SPEED_OVERLAY "${CMAKE_CURRENT_LIST_DIR}/generated/m6502_speed_s3.cpp")
+execute_process(COMMAND "${MAME_SPEED_PYTHON}"
+    "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_65xx_speed.py"
+    "${MAME_6502_OVERLAY}" "${MAME_6502_SPEED_OVERLAY}"
+    RESULT_VARIABLE MAME_SPEED_RESULT)
+if(NOT MAME_SPEED_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to prepare 6502 speed comparison")
+endif()
+set(MAME_6502_OVERLAY "${MAME_6502_SPEED_OVERLAY}")
+set(MAME_MEPHISTO_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/mephisto_internal_s3.cpp")
+execute_process(COMMAND "${MAME_SPEED_PYTHON}"
+    "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_mephisto_internal_cpu.py"
+    "${MAME_ROOT}/src/mame/drivers/mephisto_mm2.cpp" "${MAME_MEPHISTO_SOURCE}"
+    RESULT_VARIABLE MAME_MEPHISTO_RESULT)
+if(NOT MAME_MEPHISTO_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to prepare internal Mephisto CPU allocation")
+endif()
 
 if(NOT EXISTS "${MAME_EMU_ROOT}/emu.h")
     message(FATAL_ERROR
@@ -458,7 +476,7 @@ set(MAME_EMU_M1B_SRC
 # die generischen Steckplaetze liegen in src/devices (nicht in src/mame), nur
 # mmboard liegt in src/mame/machine.
 set(MAME_M1C_SRC
-    "${MAME_ROOT}/src/mame/drivers/mephisto_mm2.cpp"
+    "${MAME_MEPHISTO_SOURCE}"
     "${MAME_6502_OVERLAY}"
     "${MAME_ROOT}/src/devices/cpu/m6502/m6502d.cpp"
     "${MAME_ROOT}/src/devices/cpu/m6502/m65c02.cpp"
@@ -823,3 +841,6 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     # (Zeilenende LF), der Wert ist also 2 - nicht der des Windows-Bauhosts.
     CRLF=2
 )
+set_property(SOURCE "${MAME_6502_OVERLAY}"
+    "${MAME_ROOT}/src/devices/cpu/m6502/m65c02.cpp"
+    APPEND PROPERTY COMPILE_OPTIONS -O2 -fjump-tables -ftree-switch-conversion -fno-merge-constants)

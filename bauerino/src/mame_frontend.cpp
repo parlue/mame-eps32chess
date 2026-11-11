@@ -10,6 +10,9 @@
 #include "../../esp32s3/src/bauerino_retro_lcd.h"
 
 extern "C" {
+void s3_m6502_set_cache(bool) __attribute__((weak));
+void s3_m6502_set_speed(unsigned) __attribute__((weak));
+void s3_m65c02_reserve() __attribute__((weak));
 int mame_s3_mount_roms(void);
 int mame_s3_run_driver(const char *);
 void retro_state_init(void);
@@ -28,7 +31,9 @@ namespace {
 SemaphoreHandle_t stateMutex;
 QueueHandle_t loads;
 TaskHandle_t worker;
-alignas(16) StackType_t workerStack[32768/sizeof(StackType_t)];
+// Observed >11 KiB unused with the 32 KiB stack across both ROM regressions.
+// Retain >7 KiB measured margin and recover 4 KiB for network/internal data.
+alignas(16) StackType_t workerStack[28672/sizeof(StackType_t)];
 StaticTask_t workerControl;
 std::atomic<bool> busy{false}, stopRequested{false}, dirty{true};
 struct Guard {
@@ -64,7 +69,7 @@ bool mameFrontendBegin() {
     retro_ui_init();
     // Reserve the contiguous internal stack before Wi-Fi/BLE fragment that
     // heap. The worker remains asleep until the first actual Load request.
-    worker=xTaskCreateStaticPinnedToCore(engineTask,"mame_uci",32768,nullptr,1,
+    worker=xTaskCreateStaticPinnedToCore(engineTask,"mame_uci",sizeof(workerStack),nullptr,1,
         workerStack,&workerControl,1);
     if(!worker)return false;
     Serial.printf("[RETRO] worker reserved; internal=%u largest=%u\n",
@@ -83,6 +88,19 @@ void mameFrontendTick() {
     if(xQueueSend(loads,driver,0)!=pdTRUE){busy.store(false);retro_ui_reply("info string error Ladepuffer voll");}
 }
 bool mameFrontendBusy(){return busy.load();}
+bool mameFrontendCacheMode(bool enabled) {
+    if(busy.load() || !s3_m6502_set_cache)return false;
+    s3_m6502_set_cache(enabled);
+    Serial.printf("[MAME CACHE] enabled=%d\n",int(enabled));
+    return true;
+}
+bool mameFrontendSpeedMode(unsigned mode) {
+    if(busy.load() || !s3_m6502_set_speed || mode>3)return false;
+    if((mode&2) && s3_m65c02_reserve)s3_m65c02_reserve();
+    s3_m6502_set_speed(mode);
+    Serial.printf("[MAME SPEED] mode=%u\n",mode);
+    return true;
+}
 void mameFrontendStop(){if(busy.load())stopRequested.store(true);}
 bool mameFrontendDirty(){return dirty.exchange(false);}
 void mameFrontendDraw(uint16_t *pixels) {

@@ -378,7 +378,13 @@ void loop() {
     char c=char(Serial.read());
     if(c=='\n') {
       if(diagnostic=="bots-test" && !active)bauerino::botsVerifyAll();
-      else if(diagnostic=="http-test" && !mameFrontendBusy()) {
+      else if(diagnostic.size()==12 && diagnostic.compare(0,11,"mame-speed ")==0 && diagnostic.back()>='0' && diagnostic.back()<='3') {
+        if(!mameFrontendSpeedMode(unsigned(diagnostic.back()-'0')))Serial.println("[MAME SPEED] rejected: engine busy or feature unavailable");
+      }
+      else if(diagnostic=="mame-cache 0" || diagnostic=="mame-cache 1") {
+        if(!mameFrontendCacheMode(diagnostic.back()=='1'))Serial.println("[MAME CACHE] rejected: engine busy or feature unavailable");
+      }
+      else if(diagnostic=="http-test") {
         if(xTaskCreatePinnedToCore(httpSelfTest,"http_selftest",6144,nullptr,1,nullptr,0)!=pdPASS)Serial.println("[HTTP TEST] task allocation failed");
       } else displayDiagnostic(diagnostic);
       diagnostic.clear();

@@ -5,12 +5,12 @@ Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 
 
 ## Verified development snapshot - 11 November 2026
 
-- Combined Build 15 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
+- Combined Build 20 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
 - Actual MM IV ROM response: e2e4 -> e7e5. Actual MM V ROM opening: d2d4.
 - The device regression passed clean result-0 exits, intact heaps, return to Virginia, launcher gestures and all 215 Bot portrait decodes.
-- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 15 passed injected-gesture regression; this is not a new physical acceptance test.
-- Full application: **4,955,979 bytes**, **19,760 bytes smaller** than Build 14 after disabling AVI/MNG recording. Static internal RAM: 158,692 bytes (unchanged).
-- Emulation speed is currently about **15-16% of original speed**. The size reduction is not a demonstrated speed improvement.
+- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 20 passed two injected-gesture regressions; this is not a new physical acceptance test.
+- Full application: **5,009,375 bytes**, 53,396 more than Build 15 for the CPU speed profile. Static internal RAM: **154,612 bytes**, 4,080 fewer than Build 15.
+- Repeated short ROM tests report **18.92-18.93% original speed for MM IV** and **20.26-20.27% for MM V**. This is about **15% / 17% faster** than the measured original-dispatch reference (16.49% / 17.33%), using CPU-only O2 and jump tables. It is not full original speed or a complete search benchmark.
 
 Retro currently provides a limited ROM-test workflow: Load, dynamic UCI Options, Board, Notation, Move and Quit. Full physical-board gameplay through native Retro, additional CPU families and deferred Analyse/Setup features remain future work.
 
@@ -50,6 +50,7 @@ This is the tested development source snapshot. The combined build still uses th
 - [Desktop text and fuzzy-search size reduction](docs/22_desktop_text_profile.md)
 - [External-media and catalog size reduction](docs/23_external_media_profile.md)
 - [Movie-recording size reduction](docs/24_movie_recording_profile.md)
+- [6502 profiling and dispatch speed improvement](docs/25_6502_speed.md)
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.
