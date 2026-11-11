@@ -66,6 +66,22 @@ if(MAME_S3_65XX_MEMORY)
     endif()
 endif()
 
+option(MAME_S3_65XX_ROOTS "Keep only 16/32-bit address roots in native-8 chess profile" ON)
+if(MAME_S3_65XX_ROOTS)
+    if(NOT MAME_S3_65XX_MEMORY)
+        message(FATAL_ERROR "MAME_S3_65XX_ROOTS requires MAME_S3_65XX_MEMORY; disable both for generic buses")
+    endif()
+    set(MAME_MEMORY_ROOTS "${CMAKE_CURRENT_LIST_DIR}/generated/emumem_roots_s3.cpp")
+    execute_process(COMMAND "${MAME_PROFILE_PYTHON}"
+        "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_65xx_roots.py"
+        "${MAME_MEMORY_OVERLAY}" "${MAME_MEMORY_ROOTS}"
+        RESULT_VARIABLE MAME_ROOTS_RESULT)
+    if(NOT MAME_ROOTS_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to prepare 16/32-bit chess address roots")
+    endif()
+    set(MAME_MEMORY_OVERLAY "${MAME_MEMORY_ROOTS}")
+endif()
+
 # The 6502 interface also owns two allocated access caches. Its upstream
 # destructor is empty. Use a local owning subtype, preserving the public
 # device headers and the untouched upstream checkout.
