@@ -16,19 +16,24 @@ entries = json.loads(database.read_text(encoding='utf-8'))
 objects = []
 speed_base = root / 'esp32s3/components/mame0220/generated/m6502_s3.cpp'
 speed_overlay = speed_base.with_name('m6502_speed_s3.cpp')
+direct_memory = os.environ.get('BAUERINO_MAME_DIRECT_MEMORY') == '1'
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
-    str(speed_base), str(speed_overlay)] + (['--memory-probe'] if os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1' else []), check=True)
+    str(speed_base), str(speed_overlay)]
+    + (['--memory-probe'] if os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1' else [])
+    + (['--direct-memory'] if direct_memory else []), check=True)
 speed_selected = 0
 cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
 unity_overlay = speed_base.with_name('m6502_unity_s3.cpp')
 cmos_selected = 0
+assert not direct_memory or cpu_unity, 'Direct-memory experiment requires the CPU unity translation unit'
+cmos_source = speed_base.with_name('m65c02_direct_s3.cpp') if direct_memory else root / 'ref/mame0220-src/src/devices/cpu/m6502/m65c02.cpp'
 if cpu_unity:
     cpu_entries = [e for e in entries if Path(e['file']).name in ('m6502_s3.cpp', 'm6502_speed_s3.cpp', 'm65c02.cpp')]
     assert len(cpu_entries) == 2, 'Expected two CPU manifest entries before unity selection'
     profiles = [[t for t in shlex.split(e['command']) if t.startswith(('-I', '-D'))] for e in cpu_entries]
     assert profiles[0] == profiles[1], 'CPU unity requires identical include/define profiles'
     subprocess.run([sys.executable, str(root / 'tools/prepare_cpu_unity.py'), str(speed_overlay),
-        str(root / 'ref/mame0220-src/src/devices/cpu/m6502/m65c02.cpp'), str(unity_overlay)], check=True)
+        str(cmos_source), str(unity_overlay)], check=True)
 driver_overlay = root / 'esp32s3/components/mame0220/generated/mephisto_internal_s3.cpp'
 subprocess.run([sys.executable, str(root / 'tools/prepare_mephisto_internal_cpu.py'),
     str(root / 'ref/mame0220-src/src/mame/drivers/mephisto_mm2.cpp'), str(driver_overlay)], check=True)

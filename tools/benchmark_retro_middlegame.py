@@ -67,8 +67,10 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
     def uci(command):
         index=len(events)
         send('retro-uci '+command)
-        wait(r'^\[RETRO DIAGNOSTIC\] (accepted|rejected)$')
-        assert events[-1][1].endswith('accepted'),'USB command rejected'
+        # Firmware tasks can interleave whole markers with a profile line.
+        # Match the complete acknowledgement token, not the line boundaries.
+        ack=wait_since(r'\[RETRO DIAGNOSTIC\] (accepted|rejected)\b',index)
+        assert re.search(r'\[RETRO DIAGNOSTIC\] (accepted|rejected)\b',ack)[1]=='accepted','USB command rejected'
         return index
     try:
         usb.reset_input_buffer();usb.dtr=False;usb.rts=True;time.sleep(.1);usb.rts=False
@@ -76,7 +78,7 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         assert any('[START] Bauerino display=1' in s for _,s in events)
         assert any('[START] AP=1' in s for _,s in events)
         time.sleep(4) # Let full-frame startup animation finish before RX stress.
-        send('retro-uci go');wait(r'^\[RETRO DIAGNOSTIC\] rejected$')
+        send('retro-uci go');wait(r'\[RETRO DIAGNOSTIC\] rejected\b')
         send('x'*1030+'tap 100 320');wait(r'^\[DIAGNOSTIC\] rejected: input line too long$')
         tap(100,320);tap(300,340);tap(240,150 if a.driver=='mm4' else 250)
         loaded=True;wait(r'^\[RETRO OPEN\] '+a.driver);wait(r'^\[RETRO UCI\] readyok$')

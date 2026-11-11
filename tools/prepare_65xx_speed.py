@@ -4,7 +4,7 @@ from pathlib import Path
 from prepare_no_desktop_text import replace_body
 
 
-def prepare(source, destination, memory_probe=False):
+def prepare(source, destination, memory_probe=False, direct_memory=False):
     text = source.read_text(encoding='utf-8')
     assert source.resolve() != destination.resolve()
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
@@ -123,6 +123,9 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
     std::printf("[MAME CPU MEMORY] cpu=%p bytes=%u interface=%p cache=%p scache=%p cache_bytes=%u cached=%d\\n",
         this, unsigned(sizeof(*this)), mintf.get(), mintf->cache, mintf->scache,
         unsigned(sizeof(*mintf->cache)), int(s3_speed_mode.load() & 1));''')
+    if direct_memory:
+        from prepare_direct_memory import prepare as prepare_direct
+        text = prepare_direct(text, destination)
     if memory_probe:
         anchor = '#include <atomic>'
         text = text.replace(anchor, anchor + '\n#include "../src/s3_memory_probe.h"')
@@ -140,5 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('source', type=Path)
     parser.add_argument('destination', type=Path)
     parser.add_argument('--memory-probe', action='store_true', help='Bounded startup-only RAM/ROM access comparison')
+    parser.add_argument('--direct-memory', action='store_true', help='Qualified CPU accesses without virtual interface dispatch')
     args = parser.parse_args()
-    prepare(args.source, args.destination, args.memory_probe)
+    assert not (args.memory_probe and args.direct_memory), 'Run these comparison profiles separately'
+    prepare(args.source, args.destination, args.memory_probe, args.direct_memory)
