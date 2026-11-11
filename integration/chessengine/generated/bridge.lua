@@ -372,6 +372,7 @@ local function search_selected_piece()
 	local active_tpos = 0
 	local board_sel = {}
 	if (interface.is_selected) then
+		if interface.prepare_selection then interface.prepare_selection() end
 		for y=1,8 do
 			for x=1,8 do
 				board_sel[y*8 + x] = interface.is_selected(x, y)

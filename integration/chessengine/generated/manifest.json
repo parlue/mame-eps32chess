@@ -5,16 +5,16 @@
   "original_init_sha256": "a754eadfe0ccfef21c67a5c5fb8522fef2fd2007ee7fff774db96c6784b62542",
   "payload": {
     "bridge": {
-      "bytes": 26457,
-      "sha256": "c06028e362150c34ef91a0d3f851eacb4267113b4f4dcc5eb7ba97eb66184252"
+      "bytes": 26529,
+      "sha256": "07908187bb8a53deb8ec0c60fe021e66b6b11aa61bdb74dfceeb46567039fe69"
     },
     "bootstrap": {
       "bytes": 1559,
       "sha256": "d0fe98d6feb2c1eecab30b784a4fe16d218c0bef036e487a6fcb68a687dfed5b"
     },
     "mm4": {
-      "bytes": 4935,
-      "sha256": "38ea27b1046aec95f72b921aa30eccf0cedd37c12e29c9134f6dd4219cba3200"
+      "bytes": 5131,
+      "sha256": "fc3f40305d99f4da81572cd07a1d09930d533e2b9396cc52bbb0d1146b97e12a"
     },
     "mm5": {
       "bytes": 29,

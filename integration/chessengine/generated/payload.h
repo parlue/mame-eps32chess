@@ -377,6 +377,7 @@ local function search_selected_piece()
 	local active_tpos = 0
 	local board_sel = {}
 	if (interface.is_selected) then
+		if interface.prepare_selection then interface.prepare_selection() end
 		for y=1,8 do
 			for x=1,8 do
 				board_sel[y*8 + x] = interface.is_selected(x, y)
@@ -442,10 +443,10 @@ local function search_selected_piece()
 			send_move(move)
 		end
 
-		make_move(move, "", false)
+)cbemu_payload"
+R"cbemu_payload(		make_move(move, "", false)
 
-		-- some machines show the promotion only)cbemu_payload"
-R"cbemu_payload( after the pawn has been moved
+		-- some machines show the promotion only after the pawn has been moved
 		if (need_promotion) then
 			local new_type = nil
 			if interface.get_promotion then
@@ -531,9 +532,9 @@ local function play_moves(old, new)
 	local temp = new:sub((old:len()) + 2) .. " "
 	local n = 0
  	local move = ""
-	throttled = manager:machine():video().throttled
-	manager:machine():video)cbemu_payload"
-R"cbemu_payload(().throttled = false
+	)cbemu_payload"
+R"cbemu_payload(throttled = manager:machine():video().throttled
+	manager:machine():video().throttled = false
 	interface.edit_game(true)
 	while temp ~= "" do
 		n = temp:find(" ")
@@ -649,12 +650,12 @@ local function execute_uci_command(cmd)
 			if interface.start_play then
 				interface.start_play(not game_started)
 			end
-			my_color = ply
+			my_color =)cbemu_payload"
+R"cbemu_payload( ply
 			game_started = true
 			sel_started = false
 		end
-	elseif cmd:mat)cbemu_payload"
-R"cbemu_payload(ch("^setoption name ") ~= nil then
+	elseif cmd:match("^setoption name ") ~= nil then
 		local opt_name, opt_val = string.match(cmd:sub(16), '(.+) value (.+)')
 		if not opt_name then opt_name=cmd:sub(16); opt_val='' end
 		if     (string.lower(opt_val) == "true" ) then opt_val = "1"
@@ -768,13 +769,13 @@ local function execute_xboard_command(cmd)
 		if editmode == 2 then
 			interface.edit_game(false)
 			if interface.start_play then
-				interface.start_play(false)
+				interface.start_pl)cbemu_payload"
+R"cbemu_payload(ay(false)
 				my_color = ply
 			end
 		end
 		editmode = 0
-		setupmode = 0)cbemu_payload"
-R"cbemu_payload(
+		setupmode = 0
 		sel_started = false
 		if game_started == false or my_color ~= ply then
 			if rand_delay == 1 then
@@ -889,11 +890,11 @@ R"cbemu_payload(
 		else
 			emu.print_error("ERROR: 'Setup' mode is not supported by '" .. module .. "'!")
 			editmode = -1
-			send_cmd("resign")
+		)cbemu_payload"
+R"cbemu_payload(	send_cmd("resign")
 		end
 	else
-		manager:machine():logerror("Unhandled )cbemu_payload"
-R"cbemu_payload(xboard command '" .. cmd .. "'")
+		manager:machine():logerror("Unhandled xboard command '" .. cmd .. "'")
 	end
 end
 
@@ -1098,20 +1099,27 @@ function interface.start_play(init)
 	send_input(":KEY1_5", 0x80, 1) -- ENT
 end
 
+local selection_x = { 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71, 0x3d, 0x76 }
+local selection_y = { 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f }
+local selection_digits = {0, 0, 0, 0}
+local selection_leds = {}
+for i=0,63 do selection_leds[i] = "led" .. tostring(i) end
+
+function interface.prepare_selection()
+    local outputs = machine:outputs()
+    for i=0,3 do selection_digits[i+1] = outputs:get_value("digit" .. tostring(i)) & 0x7f end
+end
+
 function interface.is_selected(x, y)
-	local xval = { 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71, 0x3d, 0x76 }
-	local yval = { 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f }
-	local d0 = machine:outputs():get_value("digit0") & 0x7f
-	local d1 = machine:outputs():get_value("digit1") & 0x7f
-	local d2 = machine:outputs():get_value("digit2") & 0x7f
-	local d3 = machine:outputs():get_value("digit3") & 0x7f
-	return (xval[x] == d0 and yval[y] == d1) or (xval[x] == d2 and yval[y] == d3) or machine:outputs():get_value("led" .. tostring(8 * (y - 1) + (x - 1))) ~= 0
+    return (selection_x[x] == selection_digits[1] and selection_y[y] == selection_digits[2])
+        or (selection_x[x] == selection_digits[3] and selection_y[y] == selection_digits[4])
+        or machine:outputs():get_value(selecti)cbemu_payload"
+R"cbemu_payload(on_leds[8 * (y - 1) + (x - 1)]) ~= 0
 end
 
 function interface.select_piece(x, y, event)
 	local d0 = machine:outputs():get_value("digit0") & 0x7f
-	local d1 = machine:outputs():get_value("digit1") & )cbemu_payload"
-R"cbemu_payload(0x7f
+	local d1 = machine:outputs():get_value("digit1") & 0x7f
 	local d2 = machine:outputs():get_value("digit2") & 0x7f
 	local d3 = machine:outputs():get_value("digit3") & 0x7f
 	if ((d0 == 0x31 and d1 == 0x30 and d2 == 0x37 and d3 == 0x79)

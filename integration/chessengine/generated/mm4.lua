@@ -89,14 +89,21 @@ function interface.start_play(init)
 	send_input(":KEY1_5", 0x80, 1) -- ENT
 end
 
+local selection_x = { 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71, 0x3d, 0x76 }
+local selection_y = { 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f }
+local selection_digits = {0, 0, 0, 0}
+local selection_leds = {}
+for i=0,63 do selection_leds[i] = "led" .. tostring(i) end
+
+function interface.prepare_selection()
+    local outputs = machine:outputs()
+    for i=0,3 do selection_digits[i+1] = outputs:get_value("digit" .. tostring(i)) & 0x7f end
+end
+
 function interface.is_selected(x, y)
-	local xval = { 0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71, 0x3d, 0x76 }
-	local yval = { 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f }
-	local d0 = machine:outputs():get_value("digit0") & 0x7f
-	local d1 = machine:outputs():get_value("digit1") & 0x7f
-	local d2 = machine:outputs():get_value("digit2") & 0x7f
-	local d3 = machine:outputs():get_value("digit3") & 0x7f
-	return (xval[x] == d0 and yval[y] == d1) or (xval[x] == d2 and yval[y] == d3) or machine:outputs():get_value("led" .. tostring(8 * (y - 1) + (x - 1))) ~= 0
+    return (selection_x[x] == selection_digits[1] and selection_y[y] == selection_digits[2])
+        or (selection_x[x] == selection_digits[3] and selection_y[y] == selection_digits[4])
+        or machine:outputs():get_value(selection_leds[8 * (y - 1) + (x - 1)]) ~= 0
 end
 
 function interface.select_piece(x, y, event)
