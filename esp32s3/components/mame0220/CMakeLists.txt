@@ -257,6 +257,35 @@ if(MAME_S3_NO_DESKTOP_TEXT)
     set(MAME_NATKEYBOARD_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/natkeyboard_text_s3.cpp")
     set(MAME_SOFTLIST_DEVICE_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/softlist_dev_text_s3.cpp")
 endif()
+option(MAME_S3_NO_EXTERNAL_MEDIA "Omit CHD ROM disks, software catalogs and HSI metadata" ON)
+set(MAME_ROMLOAD_SOURCE "${MAME_EMU_ROOT}/romload.cpp")
+set(MAME_HASHINFO_SOURCE "${MAME_EMU_ROOT}/hashfile.cpp")
+if(MAME_S3_NO_EXTERNAL_MEDIA)
+    find_program(MAME_MEDIA_PYTHON NAMES python python3 REQUIRED)
+    foreach(MAME_MEDIA_KIND rom catalog metadata)
+        if(MAME_MEDIA_KIND STREQUAL "rom")
+            set(MAME_MEDIA_INPUT "${MAME_ROMLOAD_SOURCE}")
+            set(MAME_MEDIA_OUTPUT romload_nomedia_s3.cpp)
+            set(MAME_ROMLOAD_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/${MAME_MEDIA_OUTPUT}")
+        elseif(MAME_MEDIA_KIND STREQUAL "catalog")
+            set(MAME_MEDIA_INPUT "${MAME_SOFTLIST_DEVICE_SOURCE}")
+            set(MAME_MEDIA_OUTPUT softlist_dev_nomedia_s3.cpp)
+            set(MAME_SOFTLIST_DEVICE_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/${MAME_MEDIA_OUTPUT}")
+        else()
+            set(MAME_MEDIA_INPUT "${MAME_HASHINFO_SOURCE}")
+            set(MAME_MEDIA_OUTPUT hashfile_nomedia_s3.cpp)
+            set(MAME_HASHINFO_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/${MAME_MEDIA_OUTPUT}")
+        endif()
+        execute_process(COMMAND "${MAME_MEDIA_PYTHON}"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_no_external_media.py"
+            "${MAME_MEDIA_KIND}" "${MAME_MEDIA_INPUT}"
+            "${CMAKE_CURRENT_LIST_DIR}/generated/${MAME_MEDIA_OUTPUT}"
+            RESULT_VARIABLE MAME_MEDIA_RESULT)
+        if(NOT MAME_MEDIA_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to prepare external-media overlay")
+        endif()
+    endforeach()
+endif()
 set(MAME_EMU_SRC
     # -- Geraetebasis und Schnittstellen -------------------------------------
     "${MAME_EMU_ROOT}/device.cpp"
@@ -333,8 +362,8 @@ set(MAME_EMU_SRC
     "${MAME_EMU_ROOT}/profiler.cpp"
     # -- Dateien, ROM-Saetze, Hashes -----------------------------------------
     "${MAME_EMU_ROOT}/fileio.cpp"
-    "${MAME_EMU_ROOT}/hashfile.cpp"
-    "${MAME_EMU_ROOT}/romload.cpp"
+    "${MAME_HASHINFO_SOURCE}"
+    "${MAME_ROMLOAD_SOURCE}"
     "${MAME_EMU_ROOT}/romentry.cpp"
     # -- Ein- und Ausgabe ------------------------------------------------------
     "${MAME_EMU_ROOT}/ioport.cpp"

@@ -13,6 +13,13 @@ env.Append(ASFLAGS=['-Wa,-I' + str(root / 'esp32s3/src')])
 database = root / 'esp32s3/.pio/build/esp32s3-skeleton/compile_commands.json'
 entries = json.loads(database.read_text(encoding='utf-8'))
 objects = []
+no_external_media = env.GetProjectOption('custom_mame_external_media', 'no').lower() in ('no', 'false', '0')
+media_sources = {
+    'romload.cpp': ('rom', 'romload_nomedia_s3.cpp'),
+    'hashfile.cpp': ('metadata', 'hashfile_nomedia_s3.cpp'),
+    'softlist_dev.cpp': ('catalog', 'softlist_dev_nomedia_s3.cpp'),
+}
+media_selected = 0
 no_desktop_text = env.GetProjectOption('custom_mame_desktop_text', 'no').lower() in ('no', 'false', '0')
 text_sources = {
     'natkeyboard.cpp': ('keyboard', 'natkeyboard_text_s3.cpp'),
@@ -37,6 +44,11 @@ if no_debug_commands:
     subprocess.run([sys.executable, str(root / 'tools/prepare_no_debug_commands.py'),
         str(root / 'ref/mame0220-src/src/emu/debug/debugcmd.cpp'), str(debug_overlay)], check=True)
 groups = {}
+if no_external_media:
+    for original, (kind, overlay) in media_sources.items():
+        media_input = (root / 'esp32s3/components/mame0220/generated/softlist_dev_text_s3.cpp') if original == 'softlist_dev.cpp' and no_desktop_text else (root / 'ref/mame0220-src/src/emu' / original)
+        subprocess.run([sys.executable, str(root / 'tools/prepare_no_external_media.py'), kind,
+            str(media_input), str(root / 'esp32s3/components/mame0220/generated' / overlay)], check=True)
 for entry in entries:
     source = Path(entry['file']).resolve()
     normalized = source.as_posix()
@@ -46,10 +58,19 @@ for entry in entries:
         continue
     tokens = shlex.split(entry['command'])
     for original, (_, overlay) in text_sources.items():
-        if source.name in (original, overlay):
+        if source.name in (original, overlay) or (original == 'softlist_dev.cpp' and source.name == 'softlist_dev_nomedia_s3.cpp'):
             source = (root / 'esp32s3/components/mame0220/generated' / overlay) if no_desktop_text else (root / 'ref/mame0220-src/src/emu' / original)
             normalized = source.as_posix()
             text_selected += 1
+            break
+    for original, (_, overlay) in media_sources.items():
+        if source.name in (original, overlay) or (original == 'softlist_dev.cpp' and source.name == 'softlist_dev_text_s3.cpp'):
+            if no_external_media:
+                source = root / 'esp32s3/components/mame0220/generated' / overlay
+            elif original != 'softlist_dev.cpp':
+                source = root / 'ref/mame0220-src/src/emu' / original
+            normalized = source.as_posix()
+            media_selected += 1
             break
     if source.name in ('emumem_s3.cpp', 'emumem_roots_s3.cpp'):
         source = memory_roots if restricted_roots else memory_base
@@ -96,6 +117,7 @@ for entry in entries:
 assert len(objects) > 100, 'Missing MAME compilation manifest'
 assert memory_sources == 1, 'Expected exactly one owning MAME memory source'
 assert text_selected == 2, 'Expected exactly two desktop-text profile sources'
+assert media_selected == 3, 'Expected exactly three external-media profile sources'
 library = env.StaticLibrary('$BUILD_DIR/mame0220', objects)
 env.Append(LIBS=[library], LINKFLAGS=['-Wl,--wrap=__cxa_throw', '-frtti'])
 print('Common-SDK MAME build:', len(objects), 'sources;', len(groups), 'compile profiles')
