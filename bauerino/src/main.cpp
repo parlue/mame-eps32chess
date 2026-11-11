@@ -374,10 +374,15 @@ void loop() {
   portalProcess();
 #ifdef BAUERINO_DISPLAY
   static std::string diagnostic;
+  static bool diagnosticOverflow=false;
   while(Serial.available()) {
     char c=char(Serial.read());
     if(c=='\n') {
-      if(diagnostic=="bots-test" && !active)bauerino::botsVerifyAll();
+      if(diagnosticOverflow)Serial.println("[DIAGNOSTIC] rejected: input line too long");
+      else if(diagnostic.compare(0,10,"retro-uci ")==0) {
+        Serial.printf("[RETRO DIAGNOSTIC] %s\n",mameFrontendDiagnostic(diagnostic.c_str()+10)?"accepted":"rejected");
+      }
+      else if(diagnostic=="bots-test" && !active)bauerino::botsVerifyAll();
       else if(diagnostic.size()==12 && diagnostic.compare(0,11,"mame-speed ")==0 && diagnostic.back()>='0' && diagnostic.back()<='7') {
         if(!mameFrontendSpeedMode(unsigned(diagnostic.back()-'0')))Serial.println("[MAME SPEED] rejected: engine busy or feature unavailable");
       }
@@ -388,8 +393,9 @@ void loop() {
         if(xTaskCreatePinnedToCore(httpSelfTest,"http_selftest",6144,nullptr,1,nullptr,0)!=pdPASS)Serial.println("[HTTP TEST] task allocation failed");
       } else displayDiagnostic(diagnostic);
       diagnostic.clear();
+      diagnosticOverflow=false;
     }
-    else if(c!='\r') {if(diagnostic.size()<32)diagnostic+=c;else diagnostic.clear();}
+    else if(c!='\r' && !diagnosticOverflow) {if(diagnostic.size()<1024)diagnostic+=c;else {diagnostic.clear();diagnosticOverflow=true;}}
   }
 #endif
   web.handleClient();

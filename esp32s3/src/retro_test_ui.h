@@ -13,6 +13,7 @@ void retro_ui_open(const char *driver);
 void retro_ui_closed(void);
 void retro_ui_reply(const char *line);
 void retro_ui_observe(const char *line);
+bool retro_ui_diagnostic(const char *line);
 void retro_ui_scanline(int y, uint16_t *pixels);
 void retro_ui_rate(float percent);
 #ifdef __cplusplus

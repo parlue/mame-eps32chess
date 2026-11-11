@@ -5,12 +5,13 @@ Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 
 
 ## Verified development snapshot - 11 November 2026
 
-- Combined Build 27 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
+- Combined Build 28 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
 - Actual MM IV ROM response: e2e4 -> e7e5. Actual MM V ROM opening: d2d4.
 - The device regression passed clean result-0 exits, intact heaps, return to Virginia, launcher gestures and all 215 Bot portrait decodes.
-- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 27 passed two injected-gesture regressions; this is not a new physical acceptance test.
-- Full application: **5,002,899 bytes**; static internal RAM: **154,612 bytes**. Qualified RAM/ROM pages use a 6,168-byte PSRAM helper; I/O and mapping changes retain the MAME fallback.
-- Repeated short ROM tests report **26.45-26.53% original speed for MM IV** and **29.40-29.44% for MM V**, approximately **23-27% faster** than published Build 24. CPU-only unity compilation and skipping unconnected SYNC callbacks provide this gain. Startup memory/read/write/tap and empty/connected callback validation pass. The next practical target remains **50% original speed**, approximately another 1.7-1.9x. These opening tests are not a complete search benchmark.
+- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 28 passed an injected-gesture frontend regression and two sustained middlegame runs; this is not a new physical acceptance test.
+- Full application: **5,003,879 bytes**; static internal RAM: **154,628 bytes**. Qualified RAM/ROM pages use a 6,168-byte PSRAM helper; I/O and mapping changes retain the MAME fallback.
+- Build 27's repeated short opening tests reported **26.45-26.53% original speed for MM IV** and **29.40-29.44% for MM V**, approximately **23-27% faster** than Build 24. CPU-only unity compilation and skipping unconnected SYNC callbacks provide this gain. Startup memory/read/write/tap and empty/connected callback validation pass.
+- Build 28 keeps that CPU/clock/profile code unchanged and adds a sustained middlegame reference: **MM IV 19.79%** in a closed Spanish centre and **MM V 20.67%** in a Dragon attack, each measured during a 180-wall-second search phase after replaying 32 plies. UCI/Lua polling takes a median **25.3% / 26.6% of wall time** in these windows. These are different workloads from the opening tests, not an additional optimization or a same-position comparison between ROMs. No bestmove completed at level le 9 within either window. The practical **50%** target remains unmet, approximately another **2.4-2.5x** from these middlegame references.
 
 Retro currently provides a limited ROM-test workflow: Load, dynamic UCI Options, Board, Notation, Move and Quit. Full physical-board gameplay through native Retro, additional CPU families and deferred Analyse/Setup features remain future work.
 
@@ -55,6 +56,7 @@ This is the tested development source snapshot. The combined build still uses th
 - [Qualified RAM/ROM page access](docs/27_fast_memory_pages.md)
 - [CPU-only unity compilation](docs/28_cpu_unity.md)
 - [Unconnected SYNC output overhead](docs/29_idle_sync.md)
+- [Sustained middlegame benchmark and polling target](docs/30_middlegame_benchmark.md)
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.

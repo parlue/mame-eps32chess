@@ -23,6 +23,7 @@ void retro_state_open(const char *);
 void retro_state_closed(void);
 void retro_state_reply(const char *);
 void retro_state_observe(const char *);
+bool retro_state_diagnostic(const char *);
 void retro_state_scanline(int,uint16_t *);
 void retro_state_rate(float);
 extern const uint8_t retro_art[] asm("_binary_retro_base_rgb565_start");
@@ -102,6 +103,10 @@ bool mameFrontendSpeedMode(unsigned mode) {
     return true;
 }
 void mameFrontendStop(){if(busy.load())stopRequested.store(true);}
+bool mameFrontendDiagnostic(const char *line) {
+    if(!stateMutex || !busy.load())return false;
+    Guard lock;return retro_state_diagnostic(line);
+}
 bool mameFrontendDirty(){return dirty.exchange(false);}
 void mameFrontendDraw(uint16_t *pixels) {
     if(!stateMutex)return;

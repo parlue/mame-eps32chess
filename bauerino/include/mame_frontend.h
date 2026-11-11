@@ -10,3 +10,4 @@ void mameFrontendTap(int x, int y);
 void mameFrontendCapture(bool begin);
 bool mameFrontendCacheMode(bool enabled);
 bool mameFrontendSpeedMode(unsigned mode);
+bool mameFrontendDiagnostic(const char *line);

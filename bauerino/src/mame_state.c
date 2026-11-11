@@ -9,6 +9,7 @@
 #define retro_ui_closed retro_state_closed
 #define retro_ui_reply retro_state_reply
 #define retro_ui_observe retro_state_observe
+#define retro_ui_diagnostic retro_state_diagnostic
 #define retro_ui_scanline retro_state_scanline
 #define retro_ui_rate retro_state_rate
 #include "../../esp32s3/src/retro_test_ui.c"

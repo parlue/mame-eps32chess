@@ -38,6 +38,18 @@ int main(void){
     retro_ui_tap(60,410);retro_ui_tap(350,180); // Human black: engine opens
     expect("ucinewgame");expect("isready");retro_ui_reply("readyok");expect("go");
     assert(ply==0&&thinking&&black);
+    assert(!retro_ui_diagnostic("position startpos moves e2e4 e7e5"));
+    assert(retro_ui_diagnostic("quit"));expect("quit");retro_ui_closed();
+    assert(!retro_ui_diagnostic("go"));
+    retro_ui_open("mm4");ready=true;
+    assert(!retro_ui_diagnostic("position fen invalid"));
+    char oversized[897];memset(oversized,'x',sizeof(oversized));oversized[896]=0;
+    assert(!retro_ui_diagnostic(oversized));
+    assert(retro_ui_diagnostic("position startpos moves e2e4 e7e5 g1f3 b8c6"));
+    expect("position startpos moves e2e4 e7e5 g1f3 b8c6");assert(ply==4&&board[42]=='n');
+    assert(retro_ui_diagnostic("go"));expect("go");assert(thinking);
+    assert(!retro_ui_diagnostic("ucinewgame"));
+    assert(retro_ui_diagnostic("quit"));expect("quit");retro_ui_closed();
     puts("PASS: actual Retro UI tap routing, UCI discovery, options, white/black start, board/notation, Move, Quit and driver switch");
     return 0;
 }

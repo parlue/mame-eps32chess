@@ -134,6 +134,21 @@ void retro_ui_observe(const char *line) {
         char *save=NULL;for(char *m=strtok_r(copy," ",&save);m;m=strtok_r(NULL," ",&save))if(!append_move(m))break;
     }
 }
+// USB test transport uses the same bounded mailbox and emulation-task parser.
+// Only take over an idle, completely handshaken UI session.
+bool retro_ui_diagnostic(const char *line) {
+    if(!line || !running || !ready || handshake || strlen(line)>=896 || strchr(line,'\n') || strchr(line,'\r'))return false;
+    bool position=!strncmp(line,"position startpos moves ",24);
+    bool control=!strcmp(line,"isready") || !strcmp(line,"stop") || !strcmp(line,"quit");
+    if(!control && (thinking || !(position || !strcmp(line,"ucinewgame") || !strcmp(line,"go") || !strncmp(line,"setoption name ",15))))return false;
+    if(!strcmp(line,"quit")){queue_read=queue_count=0;}
+    if(!push(line))return false;
+    owned=false;handshake=0;
+    if(!strcmp(line,"ucinewgame"))reset_board();
+    if(position)retro_ui_observe(line);
+    if(!strcmp(line,"go")){thinking=true;message("Mittelspiel-Benchmark rechnet ...");}
+    return true;
+}
 void retro_ui_rate(float percent) {rate=percent;}
 void retro_ui_init(void) {
 #ifdef RETRO_UI_EXTERNAL_TOUCH
