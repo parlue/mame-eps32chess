@@ -95,7 +95,7 @@ bool mameFrontendCacheMode(bool enabled) {
     return true;
 }
 bool mameFrontendSpeedMode(unsigned mode) {
-    if(busy.load() || !s3_m6502_set_speed || mode>3)return false;
+    if(busy.load() || !s3_m6502_set_speed || mode>7)return false;
     if((mode&2) && s3_m65c02_reserve)s3_m65c02_reserve();
     s3_m6502_set_speed(mode);
     Serial.printf("[MAME SPEED] mode=%u\n",mode);

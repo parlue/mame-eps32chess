@@ -10,13 +10,14 @@ def prepare(source, destination):
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
     anchor = 'DEFINE_DEVICE_TYPE(M6502,'
     assert text.count(anchor) == 1
-    support = '''#include "esp_timer.h"
+    support = '''#include "../src/s3_fast_memory.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <atomic>
 
 namespace {
-std::atomic<unsigned> s3_speed_mode{1};
+std::atomic<unsigned> s3_speed_mode{5};
 int64_t s3_cpu_us = 0;
 uint64_t s3_cpu_calls = 0, s3_cpu_cycles = 0;
 struct s3_execution_scope {
@@ -53,7 +54,7 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
         owned_memory_interface() { cache = nullptr; scache = nullptr; }
         ~owned_memory_interface() override { delete cache; delete scache; }
     };
-    class cached_memory_interface final : public mi_default {
+    class cached_memory_interface : public mi_default {
     public:
         std::unique_ptr<memory_access_cache<0, 0, ENDIANNESS_LITTLE>> data_cache;
         cached_memory_interface() { cache = nullptr; scache = nullptr; }
@@ -61,16 +62,32 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
         uint8_t read(uint16_t adr) override { return data_cache->read_byte(adr); }
         void write(uint16_t adr, uint8_t val) override { data_cache->write_byte(adr, val); }
     };
-    if (s3_speed_mode.load() & 1) mintf = std::make_unique<cached_memory_interface>();
+    class paged_memory_interface final : public cached_memory_interface {
+    public:
+        std::unique_ptr<s3_fast_memory> pages;
+        uint8_t read(uint16_t adr) override { return pages->read(adr, *data_cache); }
+        void write(uint16_t adr, uint8_t val) override { pages->write(adr, val, *data_cache); }
+        uint8_t read_arg(uint16_t adr) override { return pages->read(adr, *cache); }
+        uint8_t read_sync(uint16_t adr) override { return pages->opcode(adr, *scache); }
+    };
+    if (s3_speed_mode.load() & 4) mintf = std::make_unique<paged_memory_interface>();
+    else if (s3_speed_mode.load() & 1) mintf = std::make_unique<cached_memory_interface>();
     else mintf = std::make_unique<owned_memory_interface>();
     init();
     // Upstream init registers state/caches but does not execute the CPU.
     // Initialize this independent lookup cache before reset/execution starts.
-    if (s3_speed_mode.load() & 1) {
+    if (s3_speed_mode.load() & 5) {
         auto &intf = static_cast<cached_memory_interface &>(*mintf);
         intf.data_cache.reset(intf.program->cache<0, 0, ENDIANNESS_LITTLE>());
         std::printf("[MAME DATA CACHE] data=%p operand=%p opcode=%p bytes=%u\\n",
             intf.data_cache.get(), intf.cache, intf.scache, unsigned(sizeof(*intf.data_cache)));
+    }
+    if (s3_speed_mode.load() & 4) {
+        auto &intf = static_cast<paged_memory_interface &>(*mintf);
+        intf.pages = std::make_unique<s3_fast_memory>(*intf.program, *intf.sprogram);
+        intf.pages->self_test(*intf.data_cache);
+        intf.pages.reset();
+        intf.pages = std::make_unique<s3_fast_memory>(*intf.program, *intf.sprogram);
     }''')
     anchor = '\tmintf->scache = mintf->sprogram->cache<0, 0, ENDIANNESS_LITTLE>();'
     assert text.count(anchor) == 1

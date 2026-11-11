@@ -5,12 +5,12 @@ Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 
 
 ## Verified development snapshot - 11 November 2026
 
-- Combined Build 21 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
+- Combined Build 24 includes the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
 - Actual MM IV ROM response: e2e4 -> e7e5. Actual MM V ROM opening: d2d4.
 - The device regression passed clean result-0 exits, intact heaps, return to Virginia, launcher gestures and all 215 Bot portrait decodes.
-- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 21 passed three injected-gesture regressions (reference, separate data cache, default setting); this is not a new physical acceptance test.
-- Full application: **5,009,355 bytes**; static internal RAM: **154,604 bytes**, effectively unchanged from Build 20. The independent data lookup cache uses PSRAM and is released with the CPU.
-- Repeated short ROM tests with the data cache report **19.88-19.98% original speed for MM IV** and **21.39% for MM V**. This adds about **5-6% speed** over Build 20's CPU-only O2/jump-table profile. The next practical target is at least **50% original speed**; that still needs approximately a 2.3-2.5x increase. These short opening tests are not a complete search benchmark.
+- Physical cold start, animation, finger touch and phone web access were confirmed with Build 09. Build 24 passed three injected-gesture regressions; this is not a new physical acceptance test.
+- Full application: **4,996,735 bytes**; static internal RAM: **154,604 bytes**. Qualified RAM/ROM pages use a 6,168-byte PSRAM helper; I/O and mapping changes retain the MAME fallback.
+- Repeated short ROM tests report **21.40-21.48% original speed for MM IV** and **23.27-23.47% for MM V**, approximately **7-10% faster** than published Build 21. Startup memory/read/write/tap validation also passes. The next practical target remains **50% original speed**, approximately another 2.1-2.4x. These opening tests are not a complete search benchmark.
 
 Retro currently provides a limited ROM-test workflow: Load, dynamic UCI Options, Board, Notation, Move and Quit. Full physical-board gameplay through native Retro, additional CPU families and deferred Analyse/Setup features remain future work.
 
@@ -52,6 +52,7 @@ This is the tested development source snapshot. The combined build still uses th
 - [Movie-recording size reduction](docs/24_movie_recording_profile.md)
 - [6502 profiling and dispatch speed improvement](docs/25_6502_speed.md)
 - [Independent data lookup cache](docs/26_separate_data_cache.md)
+- [Qualified RAM/ROM page access](docs/27_fast_memory_pages.md)
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.
