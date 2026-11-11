@@ -8,6 +8,33 @@ def prepare(source, destination):
     text = source.read_text(encoding='utf-8')
     assert source.resolve() != destination.resolve()
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
+    # resolve_safe() inserts a dummy function even when SYNC is unconnected.
+    # Keep real connections, but avoid two pointless callbacks per instruction.
+    assert text.count('sync_w.resolve_safe();') == 1
+    assert text.count('sync_w(ASSERT_LINE);') == 2
+    assert text.count('sync_w(CLEAR_LINE);') == 3
+    text = text.replace('sync_w(ASSERT_LINE);', 'if (sync_w) sync_w(ASSERT_LINE);')
+    text = text.replace('sync_w(CLEAR_LINE);', 'if (sync_w) sync_w(CLEAR_LINE);')
+    text = text.replace('sync_w.resolve_safe();', '''sync_w.resolve();
+    // Exercise the actual devcb API before CPU execution, including both edges.
+    {
+        auto empty = std::make_unique<devcb_write_line>(*this);
+        empty->resolve();
+        if (*empty) fatalerror("Unexpected connected empty SYNC probe");
+        unsigned edges = 0;
+        int first = -1, last = -1;
+        auto connected = std::make_unique<devcb_write_line>(*this);
+        connected->bind().set([&](int state) {
+            if (!edges) first = state;
+            ++edges; last = state;
+        });
+        connected->resolve();
+        if (*connected) (*connected)(ASSERT_LINE);
+        if (*connected) (*connected)(CLEAR_LINE);
+        if (edges != 2 || first != ASSERT_LINE || last != CLEAR_LINE)
+            fatalerror("Connected SYNC probe lost signal edges");
+        std::printf("[MAME SYNC TEST] empty=OK connected_edges=2 first=1 last=0 actual_connected=%d\\n", int(bool(sync_w)));
+    }''')
     anchor = 'DEFINE_DEVICE_TYPE(M6502,'
     assert text.count(anchor) == 1
     support = '''#include "../src/s3_fast_memory.h"

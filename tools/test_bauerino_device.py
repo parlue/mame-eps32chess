@@ -12,6 +12,7 @@ p.add_argument('--skip-intro-capture',action='store_true')
 p.add_argument('--no-captures',action='store_true')
 p.add_argument('--cache-mode',type=int,choices=[0,1],help='Select 6502 data access before loading a ROM')
 p.add_argument('--speed-mode',type=int,choices=range(8),help='Bit 0: cached data; bit 1: internal CPU; bit 2: bank pages')
+p.add_argument('--expect-idle-sync',action='store_true',help='Require successful empty/connected SYNC probes for both ROMs')
 p.add_argument('--http-during-rom',action='store_true',help='Exercise portal HTTP while the MM V worker is alive')
 a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
 device=next((d for d in list_ports.comports() if d.device==a.port),None)
@@ -109,6 +110,9 @@ with usb,(a.output/'device.log').open('w',encoding='utf-8') as log:
             assert any('[HTTP TEST] '+path+' -> HTTP/1.1 ' in s and (' 200 ' in s or ' 302 ' in s) for s in lines), 'HTTP failure: '+path
     tap(30,25);wait(r'^\[RETRO\] exit 0; integrity=OK');time.sleep(.3);capture('19-return-home')
     tap(100,140);capture('20-virginia-after-retro')
+    if a.expect_idle_sync:
+        marker='[MAME SYNC TEST] empty=OK connected_edges=2 first=1 last=0 actual_connected=0'
+        assert sum(marker in s for s in lines)==2, 'Missing SYNC callback validation for both ROMs'
     record('PASS: original launcher/Virginia/Bots/gestures, real MM IV/MM V ROM/UCI controls, clean task exits and return to original frontend')
     (a.output/'evidence.json').write_text(json.dumps({'captures':captures,'rom_replies':[move,move2],
         'capture':'Framebuffer sent to panel; not panel readback or camera',
