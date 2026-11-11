@@ -13,6 +13,17 @@ env.Append(ASFLAGS=['-Wa,-I' + str(root / 'esp32s3/src')])
 database = root / 'esp32s3/.pio/build/esp32s3-skeleton/compile_commands.json'
 entries = json.loads(database.read_text(encoding='utf-8'))
 objects = []
+no_desktop_text = env.GetProjectOption('custom_mame_desktop_text', 'no').lower() in ('no', 'false', '0')
+text_sources = {
+    'natkeyboard.cpp': ('keyboard', 'natkeyboard_text_s3.cpp'),
+    'softlist_dev.cpp': ('software', 'softlist_dev_text_s3.cpp'),
+}
+text_selected = 0
+if no_desktop_text:
+    for original, (kind, overlay) in text_sources.items():
+        subprocess.run([sys.executable, str(root / 'tools/prepare_no_desktop_text.py'), kind,
+            str(root / 'ref/mame0220-src/src/emu' / original),
+            str(root / 'esp32s3/components/mame0220/generated' / overlay)], check=True)
 restricted_roots = env.GetProjectOption('custom_mame_65xx_roots', 'yes').lower() in ('yes', 'true', '1')
 memory_base = root / 'esp32s3/components/mame0220/generated/emumem_s3.cpp'
 memory_roots = memory_base.with_name('emumem_roots_s3.cpp')
@@ -34,6 +45,12 @@ for entry in entries:
     if not any(part in normalized for part in ('/components/mame0220/', '/ref/mame0220-src/', '/integration/chessengine/src/')):
         continue
     tokens = shlex.split(entry['command'])
+    for original, (_, overlay) in text_sources.items():
+        if source.name in (original, overlay):
+            source = (root / 'esp32s3/components/mame0220/generated' / overlay) if no_desktop_text else (root / 'ref/mame0220-src/src/emu' / original)
+            normalized = source.as_posix()
+            text_selected += 1
+            break
     if source.name in ('emumem_s3.cpp', 'emumem_roots_s3.cpp'):
         source = memory_roots if restricted_roots else memory_base
         normalized = source.as_posix()
@@ -78,6 +95,7 @@ for entry in entries:
 
 assert len(objects) > 100, 'Missing MAME compilation manifest'
 assert memory_sources == 1, 'Expected exactly one owning MAME memory source'
+assert text_selected == 2, 'Expected exactly two desktop-text profile sources'
 library = env.StaticLibrary('$BUILD_DIR/mame0220', objects)
 env.Append(LIBS=[library], LINKFLAGS=['-Wl,--wrap=__cxa_throw', '-frtti'])
 print('Common-SDK MAME build:', len(objects), 'sources;', len(groups), 'compile profiles')

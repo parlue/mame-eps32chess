@@ -232,6 +232,31 @@ set(MAME_UTIL_SRC
 # unveraendert. Bewusst NICHT dabei: main.cpp (MAMEs eigenes main()), src/emu/debug/*
 # (Debugger-UI), video/rgbsse.cpp und video/rgbvmx.cpp (x86-SSE/PPC-VMX),
 # drivers/empty.cpp sowie das Grafik-/Audio-Geruest (kommt als M1b).
+option(MAME_S3_NO_DESKTOP_TEXT "Omit desktop text posting and fuzzy software suggestions" ON)
+set(MAME_NATKEYBOARD_SOURCE "${MAME_EMU_ROOT}/natkeyboard.cpp")
+set(MAME_SOFTLIST_DEVICE_SOURCE "${MAME_EMU_ROOT}/softlist_dev.cpp")
+if(MAME_S3_NO_DESKTOP_TEXT)
+    find_program(MAME_TEXT_PYTHON NAMES python python3 REQUIRED)
+    foreach(MAME_TEXT_KIND keyboard software)
+        if(MAME_TEXT_KIND STREQUAL "keyboard")
+            set(MAME_TEXT_ORIGINAL natkeyboard.cpp)
+            set(MAME_TEXT_OUTPUT natkeyboard_text_s3.cpp)
+        else()
+            set(MAME_TEXT_ORIGINAL softlist_dev.cpp)
+            set(MAME_TEXT_OUTPUT softlist_dev_text_s3.cpp)
+        endif()
+        execute_process(COMMAND "${MAME_TEXT_PYTHON}"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../tools/prepare_no_desktop_text.py"
+            "${MAME_TEXT_KIND}" "${MAME_ROOT}/src/emu/${MAME_TEXT_ORIGINAL}"
+            "${CMAKE_CURRENT_LIST_DIR}/generated/${MAME_TEXT_OUTPUT}"
+            RESULT_VARIABLE MAME_TEXT_RESULT)
+        if(NOT MAME_TEXT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to prepare desktop-text overlay")
+        endif()
+    endforeach()
+    set(MAME_NATKEYBOARD_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/natkeyboard_text_s3.cpp")
+    set(MAME_SOFTLIST_DEVICE_SOURCE "${CMAKE_CURRENT_LIST_DIR}/generated/softlist_dev_text_s3.cpp")
+endif()
 set(MAME_EMU_SRC
     # -- Geraetebasis und Schnittstellen -------------------------------------
     "${MAME_EMU_ROOT}/device.cpp"
@@ -316,7 +341,7 @@ set(MAME_EMU_SRC
     "${MAME_EMU_ROOT}/input.cpp"
     "${MAME_EMU_ROOT}/inputdev.cpp"
     "${MAME_EMU_ROOT}/uiinput.cpp"
-    "${MAME_EMU_ROOT}/natkeyboard.cpp"
+    "${MAME_NATKEYBOARD_SOURCE}"
     "${MAME_EMU_ROOT}/output.cpp"
     "${MAME_EMU_ROOT}/network.cpp"
     # http.cpp fehlt hier bewusst: MAMEs eingebauter HTTP-Server zieht asio und
@@ -365,7 +390,7 @@ set(MAME_EMU_M1B_SRC
     "${MAME_EMU_ROOT}/sound.cpp"
     "${MAME_EMU_ROOT}/speaker.cpp"
     "${MAME_EMU_ROOT}/softlist.cpp"
-    "${MAME_EMU_ROOT}/softlist_dev.cpp"
+    "${MAME_SOFTLIST_DEVICE_SOURCE}"
     "${MAME_EMU_ROOT}/video/generic.cpp"
     "${MAME_EMU_ROOT}/image.cpp"
     "${MAME_EMU_ROOT}/crsshair.cpp"
