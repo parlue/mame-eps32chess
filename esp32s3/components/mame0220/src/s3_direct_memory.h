@@ -15,29 +15,35 @@ s3_direct_memory_context s3_direct_memory;
 
 // Keep these shared: expanding the cache fallback in hundreds of instruction
 // bodies increases the interpreter's instruction-cache footprint considerably.
+#ifdef S3_DIRECT_MEMORY_FORCE_INLINE
+#define S3_DIRECT_MEMORY_ATTRIBUTE __attribute__((always_inline)) inline
+#else
+#define S3_DIRECT_MEMORY_ATTRIBUTE __attribute__((noinline))
+#endif
 template<class Interface>
-__attribute__((noinline)) u8 s3_direct_read(Interface *intf, u16 address) {
+S3_DIRECT_MEMORY_ATTRIBUTE u8 s3_direct_read(Interface *intf, u16 address) {
     if (s3_direct_memory.owner == intf)
         return s3_direct_memory.pages->read(address, *s3_direct_memory.data);
     return intf->read(address);
 }
 template<class Interface>
-__attribute__((noinline)) u8 s3_direct_arg(Interface *intf, u16 address) {
+S3_DIRECT_MEMORY_ATTRIBUTE u8 s3_direct_arg(Interface *intf, u16 address) {
     if (s3_direct_memory.owner == intf)
         return s3_direct_memory.pages->read(address, *s3_direct_memory.args);
     return intf->read_arg(address);
 }
 template<class Interface>
-__attribute__((noinline)) u8 s3_direct_opcode(Interface *intf, u16 address) {
+S3_DIRECT_MEMORY_ATTRIBUTE u8 s3_direct_opcode(Interface *intf, u16 address) {
     if (s3_direct_memory.owner == intf)
         return s3_direct_memory.pages->opcode(address, *s3_direct_memory.opcodes);
     return intf->read_sync(address);
 }
 template<class Interface>
-__attribute__((noinline)) void s3_direct_write(Interface *intf, u16 address, u8 value) {
+S3_DIRECT_MEMORY_ATTRIBUTE void s3_direct_write(Interface *intf, u16 address, u8 value) {
     if (s3_direct_memory.owner == intf)
         s3_direct_memory.pages->write(address, value, *s3_direct_memory.data);
     else
         intf->write(address, value);
 }
+#undef S3_DIRECT_MEMORY_ATTRIBUTE
 }

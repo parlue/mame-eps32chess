@@ -66,6 +66,7 @@ This is the tested development source snapshot. The combined build still uses th
 - [Startup memory-path measurements](docs/32_memory_access_probe.md)
 - [Direct CPU access experiments](docs/33_direct_cpu_memory.md)
 - [Opcode frequencies and bounded IRAM placement](docs/34_opcode_hot_routines.md)
+- [Bounded inline memory experiment](docs/35_hot_direct_memory.md): +1.07% / +1.20% in single matched runs, at 1,040 extra SRAM bytes. Kept opt-in; Build 40 restored the exact adopted IRAM application and passed the device regression again.
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.

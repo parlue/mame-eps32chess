@@ -1,0 +1,9 @@
+{
+  "description": "Opt-in qualified inline memory access only inside these already-selected IRAM routines; preserve all instruction and cycle checks.",
+  "routines": [
+    "m6502_device::prefetch",
+    "m6502_device::bmi_rel_full",
+    "m6502_device::beq_rel_full",
+    "m6502_device::cmp_zpg_full"
+  ]
+}

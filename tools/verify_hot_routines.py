@@ -37,12 +37,20 @@ def shared_iram_reserved(path):
     return int(match[1], 16)
 
 
+def static_dram_end(path):
+    text = path.read_text(errors='replace')
+    match = re.search(r'^\s+0x([0-9a-f]+)\s+_bss_end = ABSOLUTE', text, re.M)
+    assert match, 'Expected S3 static DRAM end symbol'
+    return int(match[1], 16)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--nm', type=Path, required=True)
     parser.add_argument('--baseline-map', type=Path, required=True)
     parser.add_argument('--build', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--hot-direct', action='store_true', help='Require the bounded inline-memory experiment marker')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     plan = json.loads((root / 'tools/65xx_hot_routines.json').read_text())
@@ -54,11 +62,14 @@ if __name__ == '__main__':
         for piece in [info] + info.get('parts', []):
             assert piece['address'] is not None and 0x40374000 <= piece['address'] < 0x403cb700, f'Not in internal instruction RAM: {name}'
         selected[name] = info
-    extra = shared_iram_reserved(args.build / 'firmware.map') - shared_iram_reserved(args.baseline_map)
+    iram_extra = shared_iram_reserved(args.build / 'firmware.map') - shared_iram_reserved(args.baseline_map)
+    extra = static_dram_end(args.build / 'firmware.map') - static_dram_end(args.baseline_map)
     assert 0 < extra <= plan['extra_iram_budget_bytes'], f'Actual shared SRAM cost {extra} exceeds bounded budget'
     binary = (args.build / 'firmware.bin').read_bytes()
     assert b'[MAME OPCODE COUNTS]' not in binary and b'[MAME DIRECT MEMORY]' not in binary, 'Diagnostic/other experimental path still present'
-    result = {'extra_shared_sram_bytes': extra, 'budget_bytes': plan['extra_iram_budget_bytes'], 'selected': selected,
+    assert (b'[MAME HOT DIRECT]' in binary) == args.hot_direct, 'Wrong inline-memory profile in application'
+    result = {'extra_shared_sram_bytes': extra, 'extra_iram_reserved_bytes': iram_extra,
+              'budget_bytes': plan['extra_iram_budget_bytes'], 'selected': selected,
               'note': 'Function text plus literal/alignment cost is bounded by actual linker SRAM reservation; runtime heap still requires device validation.'}
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))

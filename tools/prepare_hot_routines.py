@@ -4,7 +4,7 @@ import re
 from prepare_direct_memory import write_changed
 
 
-def prepare(base_text, destination):
+def prepare(base_text, destination, direct=False):
     generated = destination.parent.resolve()
     component = generated.parent
     root = component.parents[2]
@@ -14,6 +14,11 @@ def prepare(base_text, destination):
     assert all(re.fullmatch(r'm(?:6502|65c02)_device::\w+', name) for name in selected)
     matched = set()
     marker = 'IRAM_ATTR __attribute__((noinline)) '
+    rewrite = lambda text: text
+    if direct:
+        from prepare_hot_direct import HotDirectRewrite, attach_context
+        rewrite = HotDirectRewrite(root, selected)
+        base_text = attach_context(base_text)
 
     def annotate(text):
         original = text
@@ -27,14 +32,14 @@ def prepare(base_text, destination):
         assert text.replace(marker, '') == original, 'Only function placement may change'
         return text
 
-    base_text = annotate(base_text)
+    base_text = annotate(rewrite(base_text))
     base_text = base_text.replace('#include "../src/s3_fast_memory.h"',
                                   '#include "../src/s3_fast_memory.h"\n#include "esp_attr.h"')
     for name in ('m6502', 'm65c02'):
         original = (component / f'include/cpu/m6502/{name}.hxx').read_text()
-        write_changed(generated / f'{name}_hot_s3.hxx', annotate(original))
+        write_changed(generated / f'{name}_hot_s3.hxx', annotate(rewrite(original)))
     cmos = root / 'ref/mame0220-src/src/devices/cpu/m6502/m65c02.cpp'
-    text = annotate(cmos.read_text())
+    text = annotate(rewrite(cmos.read_text()))
     for name in ('m65c02.h', 'm65c02d.h'):
         text = text.replace(f'#include "{name}"', f'#include "{(cmos.parent / name).as_posix()}"')
     old = '#include "cpu/m6502/m65c02.hxx"'
@@ -43,5 +48,7 @@ def prepare(base_text, destination):
     old = '#include "cpu/m6502/m6502.hxx"'
     assert base_text.count(old) == 1
     assert matched == selected, f'Missing selected routine definitions: {selected - matched}'
+    if direct:
+        rewrite.check()
     print(f'IRAM placement overlay prepared: {len(selected)} CPU routines; bodies unchanged')
     return base_text.replace(old, '#include "m6502_hot_s3.hxx"')

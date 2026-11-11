@@ -17,6 +17,7 @@ objects = []
 speed_base = root / 'esp32s3/components/mame0220/generated/m6502_s3.cpp'
 speed_overlay = speed_base.with_name('m6502_speed_s3.cpp')
 direct_memory = os.environ.get('BAUERINO_MAME_DIRECT_MEMORY') == '1'
+hot_direct = os.environ.get('BAUERINO_MAME_HOT_DIRECT') == '1'
 memory_probe = os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1'
 opcode_profile = os.environ.get('BAUERINO_MAME_OPCODE_PROFILE') == '1'
 cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
@@ -24,11 +25,13 @@ cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('ye
 # non-unity comparisons retain their original CPU unless explicitly requested.
 hot_default = cpu_unity and not (direct_memory or memory_probe or opcode_profile)
 hot_routines = os.environ.get('BAUERINO_MAME_HOT_ROUTINES', '1' if hot_default else '0') == '1'
+assert not hot_direct or hot_routines, 'Combined hot-direct experiment requires IRAM routines'
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
     str(speed_base), str(speed_overlay)]
     + (['--memory-probe'] if memory_probe else [])
     + (['--opcode-profile'] if opcode_profile else [])
-    + (['--hot-routines'] if hot_routines else [])
+    + (['--hot-routines'] if hot_routines and not hot_direct else [])
+    + (['--hot-direct'] if hot_direct else [])
     + (['--direct-memory'] if direct_memory else []), check=True)
 speed_selected = 0
 unity_overlay = speed_base.with_name('m6502_unity_s3.cpp')

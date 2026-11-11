@@ -4,7 +4,7 @@ from pathlib import Path
 from prepare_no_desktop_text import replace_body
 
 
-def prepare(source, destination, memory_probe=False, direct_memory=False, opcode_profile=False, hot_routines=False):
+def prepare(source, destination, memory_probe=False, direct_memory=False, opcode_profile=False, hot_routines=False, hot_direct=False):
     text = source.read_text(encoding='utf-8')
     assert source.resolve() != destination.resolve()
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
@@ -144,9 +144,9 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
     if direct_memory:
         from prepare_direct_memory import prepare as prepare_direct
         text = prepare_direct(text, destination)
-    if hot_routines:
+    if hot_routines or hot_direct:
         from prepare_hot_routines import prepare as prepare_hot
-        text = prepare_hot(text, destination)
+        text = prepare_hot(text, destination, hot_direct)
     if memory_probe:
         anchor = '#include <atomic>'
         text = text.replace(anchor, anchor + '\n#include "../src/s3_memory_probe.h"')
@@ -167,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--direct-memory', action='store_true', help='Qualified CPU accesses without virtual interface dispatch')
     parser.add_argument('--opcode-profile', action='store_true', help='Diagnostic instruction-start histogram, not speed measurements')
     parser.add_argument('--hot-routines', action='store_true', help='Explicitly selected CPU routine placement in internal instruction RAM')
+    parser.add_argument('--hot-direct', action='store_true', help='Inline qualified memory only in a selected IRAM subset')
     args = parser.parse_args()
-    assert sum((args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines)) <= 1, 'Run these comparison profiles separately'
-    prepare(args.source, args.destination, args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines)
+    assert sum((args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines, args.hot_direct)) <= 1, 'Run these comparison profiles separately'
+    prepare(args.source, args.destination, args.memory_probe, args.direct_memory, args.opcode_profile, args.hot_routines, args.hot_direct)
