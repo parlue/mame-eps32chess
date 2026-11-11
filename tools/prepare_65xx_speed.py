@@ -4,7 +4,7 @@ from pathlib import Path
 from prepare_no_desktop_text import replace_body
 
 
-def prepare(source, destination):
+def prepare(source, destination, memory_probe=False):
     text = source.read_text(encoding='utf-8')
     assert source.resolve() != destination.resolve()
     assert '~owned_memory_interface() override { delete cache; delete scache; }' in text
@@ -123,6 +123,12 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
     std::printf("[MAME CPU MEMORY] cpu=%p bytes=%u interface=%p cache=%p scache=%p cache_bytes=%u cached=%d\\n",
         this, unsigned(sizeof(*this)), mintf.get(), mintf->cache, mintf->scache,
         unsigned(sizeof(*mintf->cache)), int(s3_speed_mode.load() & 1));''')
+    if memory_probe:
+        anchor = '#include <atomic>'
+        text = text.replace(anchor, anchor + '\n#include "../src/s3_memory_probe.h"')
+        anchor = 'intf.pages = std::make_unique<s3_fast_memory>(*intf.program, *intf.sprogram);\n    }'
+        assert text.count(anchor) == 1
+        text = text.replace(anchor, anchor.replace('\n    }', '\n        s3_memory_probe<memory_interface>::run(*mintf, *intf.data_cache, *intf.pages);\n    }'))
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists() or destination.read_text(encoding='utf-8') != text:
         destination.write_text(text, encoding='utf-8', newline='\n')
@@ -133,5 +139,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('destination', type=Path)
+    parser.add_argument('--memory-probe', action='store_true', help='Bounded startup-only RAM/ROM access comparison')
     args = parser.parse_args()
-    prepare(args.source, args.destination)
+    prepare(args.source, args.destination, args.memory_probe)

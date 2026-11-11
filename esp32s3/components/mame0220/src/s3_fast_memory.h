@@ -103,6 +103,13 @@ public:
     }
     s3_fast_memory(const s3_fast_memory &) = delete;
     s3_fast_memory &operator=(const s3_fast_memory &) = delete;
+    // Startup-only probe: expose only already-qualified, side-effect-free bytes.
+    const u8 *probe_read_pointer(u16 address) const {
+        if (!m_valid) return nullptr;
+        const auto &p = m_reads[address >> 8];
+        auto *base = p.base();
+        return base ? base + p.offset + (address & 255) : nullptr;
+    }
     u8 read(u16 address, cache_type &fallback) const { return read_from(m_reads, address, fallback); }
     u8 opcode(u16 address, cache_type &fallback) const { return read_from(m_opcode_reads ? *m_opcode_reads : m_reads, address, fallback); }
     void write(u16 address, u8 value, cache_type &fallback) const {

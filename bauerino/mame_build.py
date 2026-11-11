@@ -1,6 +1,7 @@
 """Build the selected MAME sources with the frontend's own Arduino/IDF SDK."""
 Import('env')
 import hashlib
+import os
 import json
 import shlex
 import subprocess
@@ -16,7 +17,7 @@ objects = []
 speed_base = root / 'esp32s3/components/mame0220/generated/m6502_s3.cpp'
 speed_overlay = speed_base.with_name('m6502_speed_s3.cpp')
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
-    str(speed_base), str(speed_overlay)], check=True)
+    str(speed_base), str(speed_overlay)] + (['--memory-probe'] if os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1' else []), check=True)
 speed_selected = 0
 cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
 unity_overlay = speed_base.with_name('m6502_unity_s3.cpp')
@@ -158,6 +159,8 @@ for entry in entries:
         core = core.Clone()
         core.ProcessUnFlags('-Os -O1 -O2 -O3 -fno-jump-tables -fno-tree-switch-conversion')
         core.Append(CCFLAGS=['-O2', '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
+        if os.environ.get('BAUERINO_MAME_CPU_ASM') == '1':
+            core.Append(CCFLAGS=['-save-temps=obj'])
     key = hashlib.sha256(normalized.encode()).hexdigest()[:12]
     objects.extend(core.Object(str(Path(env.subst('$BUILD_DIR')) / 'mame' / (source.stem + '-' + key)), str(source)))
 
