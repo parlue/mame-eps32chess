@@ -1,0 +1,55 @@
+# Private/reference inputs and exact local hardware backups
+/ref/
+/backups/
+/incoming/
+/incoming_inventory.*
+**/local-roms/
+**/rom-image/
+**/roms/
+
+# Toolchains, generated SDK data and build products
+**/.pio/
+**/build/
+**/build-host/
+**/build-xtensa/
+**/CMakeFiles/
+**/__pycache__/
+**/*.pyc
+*.exe
+*.dll
+*.o
+*.obj
+*.a
+*.elf
+*.map
+*.bin
+*.zip
+*.7z
+*.log
+*.tmp
+*.bak*
+**/sdkconfig.esp32s3-skeleton*
+/esp32s3/generated/
+/esp32s3/components/mame0220/generated/
+
+# Raw local diagnostics are not project source
+/docs/*/
+/docs/*.txt
+/docs/*.json
+/docs/*.csv
+/docs/*.png
+/docs/*.html
+/docs/_*
+/integration/chessengine/audit/
+/tools/*.cmd
+
+# Credentials and local editor configuration
+.env
+**/secrets.h
+**/credentials.json
+.env.*
+!.env.example
+*.pem
+*.key
+.vscode/
+.idea/

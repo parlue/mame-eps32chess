@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>espmame · Retro-Schach</title>
+<style>
+:root{color-scheme:dark;--bg:#10191a;--panel:#1b2829;--line:#354748;--accent:#e8b975;--muted:#a7b9b8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f3f1e9;font:16px/1.5 system-ui,sans-serif}
+header,main{max-width:1160px;margin:auto;padding:24px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+h1{font-size:25px;margin:0;letter-spacing:.06em}h1 span{color:var(--accent)}h2{font-size:18px;margin:0 0 15px}.kicker{color:var(--accent);font-size:11px;letter-spacing:.15em;text-transform:uppercase}
+.subtitle{color:var(--muted);margin:2px 0 0;font-size:14px}.badge{border:1px solid var(--line);border-radius:30px;padding:6px 13px;font-size:12px}
+main>section{min-width:0}main{display:grid;grid-template-columns:minmax(300px,1.25fr) minmax(300px,1fr);gap:24px;padding-top:28px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px}
+#board{display:block;width:100%;border:7px solid #304344;border-radius:8px;overflow:hidden}
+.square{position:relative;float:left;width:12.5%;height:0;padding-bottom:12.5%;overflow:hidden;background:#e3d5b9;color:#162222;font-family:"Segoe UI Symbol",serif;text-shadow:0 1px 1px #0003}.piece{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;font-size:clamp(25px,5vw,56px);line-height:1}
+.square.dark{background:#70918c}.square .coord{position:absolute;bottom:3px;left:4px;font:10px system-ui;color:#294341}.square.recent{box-shadow:inset 0 0 0 4px #e7b361}.square.whitepiece{color:#fffdf4;text-shadow:1px 1px 2px #172826,-1px -1px 1px #172826}
+#message{font-size:19px;margin:0 0 5px}#notice{color:var(--accent);font-size:14px;min-height:24px}#connection{color:var(--muted);font-size:13px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}input,select,button{font:inherit;border:1px solid var(--line);border-radius:7px;padding:10px 12px}input,select{background:#111e1f;color:#f3f1e9;width:100%;min-width:0}input[type=checkbox]{width:auto}
+button{background:#304849;color:#f5f0e7;cursor:pointer;font-weight:600}button:hover{filter:brightness(1.17)}button.primary{background:var(--accent);color:#252016;border-color:var(--accent)}button.danger{color:#ffb6a8;border-color:#85524b;background:transparent}button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.row .narrow{flex:.55}.actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}.actions button{flex:1}.small{font-size:12px;color:var(--muted)}#moves{overflow:auto;max-height:130px;color:#e2d3b7;font:14px/1.8 ui-monospace,monospace;white-space:pre-wrap}
+#info{font:12px/1.6 ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted)}details summary{cursor:pointer;font-size:13px;color:var(--muted)}#fen{font:11px/1.5 ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted);margin-top:10px}#options{max-height:440px;overflow-y:auto}.parameter{padding:8px 0 12px;border-top:1px solid var(--line)}.parameter .row{margin-top:5px}.parameter button{flex:0}
+#peers button{display:block;width:100%;text-align:left;margin-top:8px}.hidden{display:none!important}
+@media(max-width:760px){main{grid-template-columns:minmax(0,1fr);padding:14px;gap:0}header{padding:18px}.panel{padding:16px}.piece{font-size:32px;font-size:clamp(24px,9vw,56px)}.badge{display:none}}
+</style>
+<header><div><div class="kicker">ESP32-S3 · Chessnut · UCI</div><h1>esp<span>mame</span></h1><p class="subtitle">Klassische Schachcomputer. Auf deinem Brett.</p></div><span id="badge" class="badge">Verbindung wird aufgebaut</span></header>
+<main>
+<section>
+<div class="panel"><p id="message">Bereit für die erste Partie</p><div id="connection">Verbinde dich mit dem ESP32.</div><div id="notice" role="status" aria-live="polite"></div><div id="board" aria-label="Aktuelle Schachstellung"><div class="square" aria-label="a8"><span class="piece">♜</span><span class="coord">a8</span></div><div class="square dark" aria-label="b8"><span class="piece">♞</span><span class="coord">b8</span></div><div class="square" aria-label="c8"><span class="piece">♝</span><span class="coord">c8</span></div><div class="square dark" aria-label="d8"><span class="piece">♛</span><span class="coord">d8</span></div><div class="square" aria-label="e8"><span class="piece">♚</span><span class="coord">e8</span></div><div class="square dark" aria-label="f8"><span class="piece">♝</span><span class="coord">f8</span></div><div class="square" aria-label="g8"><span class="piece">♞</span><span class="coord">g8</span></div><div class="square dark" aria-label="h8"><span class="piece">♜</span><span class="coord">h8</span></div><div class="square dark" aria-label="a7"><span class="piece">♟</span><span class="coord">a7</span></div><div class="square" aria-label="b7"><span class="piece">♟</span><span class="coord">b7</span></div><div class="square dark" aria-label="c7"><span class="piece">♟</span><span class="coord">c7</span></div><div class="square" aria-label="d7"><span class="piece">♟</span><span class="coord">d7</span></div><div class="square dark" aria-label="e7"><span class="piece">♟</span><span class="coord">e7</span></div><div class="square" aria-label="f7"><span class="piece">♟</span><span class="coord">f7</span></div><div class="square dark" aria-label="g7"><span class="piece">♟</span><span class="coord">g7</span></div><div class="square" aria-label="h7"><span class="piece">♟</span><span class="coord">h7</span></div><div class="square" aria-label="a6"><span class="piece"></span><span class="coord">a6</span></div><div class="square dark" aria-label="b6"><span class="piece"></span><span class="coord">b6</span></div><div class="square" aria-label="c6"><span class="piece"></span><span class="coord">c6</span></div><div class="square dark" aria-label="d6"><span class="piece"></span><span class="coord">d6</span></div><div class="square" aria-label="e6"><span class="piece"></span><span class="coord">e6</span></div><div class="square dark" aria-label="f6"><span class="piece"></span><span class="coord">f6</span></div><div class="square" aria-label="g6"><span class="piece"></span><span class="coord">g6</span></div><div class="square dark" aria-label="h6"><span class="piece"></span><span class="coord">h6</span></div><div class="square dark" aria-label="a5"><span class="piece"></span><span class="coord">a5</span></div><div class="square" aria-label="b5"><span class="piece"></span><span class="coord">b5</span></div><div class="square dark" aria-label="c5"><span class="piece"></span><span class="coord">c5</span></div><div class="square" aria-label="d5"><span class="piece"></span><span class="coord">d5</span></div><div class="square dark" aria-label="e5"><span class="piece"></span><span class="coord">e5</span></div><div class="square" aria-label="f5"><span class="piece"></span><span class="coord">f5</span></div><div class="square dark" aria-label="g5"><span class="piece"></span><span class="coord">g5</span></div><div class="square" aria-label="h5"><span class="piece"></span><span class="coord">h5</span></div><div class="square" aria-label="a4"><span class="piece"></span><span class="coord">a4</span></div><div class="square dark" aria-label="b4"><span class="piece"></span><span class="coord">b4</span></div><div class="square" aria-label="c4"><span class="piece"></span><span class="coord">c4</span></div><div class="square dark" aria-label="d4"><span class="piece"></span><span class="coord">d4</span></div><div class="square" aria-label="e4"><span class="piece"></span><span class="coord">e4</span></div><div class="square dark" aria-label="f4"><span class="piece"></span><span class="coord">f4</span></div><div class="square" aria-label="g4"><span class="piece"></span><span class="coord">g4</span></div><div class="square dark" aria-label="h4"><span class="piece"></span><span class="coord">h4</span></div><div class="square dark" aria-label="a3"><span class="piece"></span><span class="coord">a3</span></div><div class="square" aria-label="b3"><span class="piece"></span><span class="coord">b3</span></div><div class="square dark" aria-label="c3"><span class="piece"></span><span class="coord">c3</span></div><div class="square" aria-label="d3"><span class="piece"></span><span class="coord">d3</span></div><div class="square dark" aria-label="e3"><span class="piece"></span><span class="coord">e3</span></div><div class="square" aria-label="f3"><span class="piece"></span><span class="coord">f3</span></div><div class="square dark" aria-label="g3"><span class="piece"></span><span class="coord">g3</span></div><div class="square" aria-label="h3"><span class="piece"></span><span class="coord">h3</span></div><div class="square whitepiece" aria-label="a2"><span class="piece">♟</span><span class="coord">a2</span></div><div class="square dark whitepiece" aria-label="b2"><span class="piece">♟</span><span class="coord">b2</span></div><div class="square whitepiece" aria-label="c2"><span class="piece">♟</span><span class="coord">c2</span></div><div class="square dark whitepiece" aria-label="d2"><span class="piece">♟</span><span class="coord">d2</span></div><div class="square whitepiece" aria-label="e2"><span class="piece">♟</span><span class="coord">e2</span></div><div class="square dark whitepiece" aria-label="f2"><span class="piece">♟</span><span class="coord">f2</span></div><div class="square whitepiece" aria-label="g2"><span class="piece">♟</span><span class="coord">g2</span></div><div class="square dark whitepiece" aria-label="h2"><span class="piece">♟</span><span class="coord">h2</span></div><div class="square dark whitepiece" aria-label="a1"><span class="piece">♜</span><span class="coord">a1</span></div><div class="square whitepiece" aria-label="b1"><span class="piece">♞</span><span class="coord">b1</span></div><div class="square dark whitepiece" aria-label="c1"><span class="piece">♝</span><span class="coord">c1</span></div><div class="square whitepiece" aria-label="d1"><span class="piece">♛</span><span class="coord">d1</span></div><div class="square dark whitepiece" aria-label="e1"><span class="piece">♚</span><span class="coord">e1</span></div><div class="square whitepiece" aria-label="f1"><span class="piece">♝</span><span class="coord">f1</span></div><div class="square dark whitepiece" aria-label="g1"><span class="piece">♞</span><span class="coord">g1</span></div><div class="square whitepiece" aria-label="h1"><span class="piece">♜</span><span class="coord">h1</span></div></div><div class="actions"><button id="flip">Brett drehen</button></div><div id="fen"></div></div>
+<div class="panel"><h2>Partieverlauf</h2><div id="moves">Noch keine Züge</div><div id="info"></div></div>
+</section>
+<section>
+<div class="panel"><h2>Engine & Partie</h2>
+<form id="config">
+<label for="engine">Engine</label><select id="engine"><option value="virgin">Virgin 0.8.0 ? lokal auf dem ESP32-S3</option><option value="demo">Testgegner · kein Retrocomputer</option><option value="mame">MAME / MessChess · UCI über TCP</option></select>
+<div id="endpoint" class="hidden"><div class="row"><div><label for="host">Engine-Adresse</label><input id="host" value="192.168.4.2" maxlength="128"></div><div class="narrow"><label for="port">TCP-Port</label><input id="port" type="number" min="1" max="65535" value="5555"></div></div><p class="small">Die Engine muss UCI-Textzeilen über eine TCP-Verbindung austauschen. Der ESP-MAME-Port wird später hier angebunden.</p></div>
+<label for="input">Zugeingabe</label><select id="input"><option value="chessnut">Chessnut / ChessLink</option></select>
+<label for="moveMs">Bedenkzeit je Engine-Zug (Millisekunden)</label><input id="moveMs" type="number" value="3000" min="100" max="300000">
+<div class="actions"><button id="configure" type="submit">Engine verbinden</button></div>
+</form>
+<label for="color">Ich spiele</label><select id="color"><option value="white">Weiß</option><option value="black">Schwarz</option></select>
+<div class="actions"><button class="primary" id="new">Neues Spiel</button><button class="danger" id="abort">Abbruch</button></div>
+<p class="small">Bei Chessnut vor Spielbeginn die Grundstellung aufbauen. Engine-Züge werden angezeigt und müssen am Brett nachgezogen werden.</p>
+<form id="manual"><label for="move">Spielerzug im Browser</label><div class="row"><input id="move" placeholder="e2e4" pattern="[a-h][1-8][a-h][1-8][qrbn]?" maxlength="5" required aria-label="Zug in UCI-Schreibweise"><button type="submit">Ziehen</button></div></form>
+</div>
+<div class="panel"><h2>UCI-Parameter</h2><p class="small">Die verfügbaren Parameter meldet die verbundene Engine. Änderungen vor der Partie vornehmen.</p><div id="options">Engine verbinden, um Optionen einzulesen.</div></div>
+<div class="panel"><h2>E-Boards ? Chessnut / ChessLink</h2><p id="boardStatus" class="small">Noch kein Brett verbunden</p><button id="scan">Bretter suchen</button><div id="peers"></div></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function replaceContent(node,fragment){
+  if(typeof node.replaceChildren==='function')node.replaceChildren(fragment);
+  else{while(node.firstChild)node.removeChild(node.firstChild);node.appendChild(fragment);}
+}
+const glyphs={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+let flipped=false,state=null,optionSignature='',peerSignature='',initialized=false;
+const initial='RNBQKBNRPPPPPPPP................................pppppppprnbqkbnr';
+function draw(board=initial) {
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<64;i++){
+    const s=flipped?(i%8)+(7-Math.floor(i/8))*8:Math.floor(i/8)*8+7-i%8;
+    const index=63-s,piece=board[index],cell=document.createElement('div');
+    cell.className='square'+(((index%8+Math.floor(index/8))%2===0)?' dark':'')+(piece&&piece!=='.'&&piece===piece.toUpperCase()?' whitepiece':'');
+    const symbol=document.createElement('span');symbol.className='piece';symbol.textContent=glyphs[piece]||'';cell.appendChild(symbol);
+    cell.setAttribute('aria-label',String.fromCharCode(97+index%8)+(1+Math.floor(index/8))+' '+(piece==='.'?'leer':piece));
+    const coord=document.createElement('span');coord.className='coord';coord.textContent=String.fromCharCode(97+index%8)+(1+Math.floor(index/8));cell.appendChild(coord);
+    frag.appendChild(cell);
+  }
+  replaceContent($('board'),frag);
+}
+async function post(path,body={}) {
+  try{
+    const r=await fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});
+    const data=await r.json();$('notice').textContent=data.message;
+    if(!r.ok) return false;
+    await refresh();return true;
+  }catch(e){$('notice').textContent='ESP32 nicht erreichbar. WLAN-Verbindung prüfen.';return false;}
+}
+function options(list,active){
+  const signature=JSON.stringify(list);
+  if(signature!==optionSignature){
+    optionSignature=signature;const frag=document.createDocumentFragment();
+    list.forEach((o,index)=>{
+      const box=document.createElement('div');box.className='parameter';
+      const label=document.createElement('label');label.textContent=o.name;label.htmlFor='opt'+index;box.appendChild(label);
+      const row=document.createElement('div');row.className='row';let control;
+      if(o.type==='combo'){control=document.createElement('select');o.choices.forEach(v=>{const op=document.createElement('option');op.value=v;op.textContent=v;control.appendChild(op)});control.value=o.value;}
+      else{control=document.createElement('input');control.type=o.type==='check'?'checkbox':o.type==='spin'?'number':'text';if(o.type==='check')control.checked=o.value==='true';else control.value=o.value;if(o.type==='spin'){control.min=o.min;control.max=o.max;}}
+      control.id='opt'+index;
+      if(o.type!=='button') row.appendChild(control);
+      const button=document.createElement('button');button.textContent=o.type==='button'?'Ausführen':'Setzen';
+      button.onclick=()=>post('option',{name:o.name,value:o.type==='button'?'':o.type==='check'?String(control.checked):control.value});row.appendChild(button);box.appendChild(row);frag.appendChild(box);
+    });
+    if(!list.length){const p=document.createElement('p');p.className='small';p.textContent='Keine Optionen gemeldet. Engine verbinden oder Handshake abwarten.';frag.appendChild(p);}
+    replaceContent($('options'),frag);
+  }
+  $('options').querySelectorAll('button,input,select').forEach(el=>el.disabled=active||!state||state.engineState!==3);
+}
+async function refresh(){
+  try{
+    const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw new Error();
+    state=await r.json();const s=state;
+    $('badge').textContent=s.active?'Partie läuft':'Bereit';
+    $('message').textContent=s.message;$('connection').textContent=(s.engineName||'Keine Engine verbunden')+' · '+(s.input==='browser'?'Browser-Eingabe':s.boardStatus);
+    if(s.error)$('notice').textContent=s.error;
+    draw(s.board);$('fen').textContent=s.fen;
+    let moves='';s.moves.forEach((m,i)=>{if(i%2===0)moves+=(i/2+1)+'. ';moves+=m+' ';});
+    $('moves').textContent=moves||'Noch keine Züge';$('info').textContent=s.info;
+    $('manual').classList.toggle('hidden',s.input!=='browser');
+    $('manual').querySelectorAll('input,button').forEach(el=>el.disabled=!s.active||s.thinking);
+    $('config').querySelectorAll('input,select,button').forEach(el=>el.disabled=s.active);
+    $('boardStatus').textContent=s.boardStatus+(s.dropped?' · verworfene Pakete: '+s.dropped:'');
+    $('scan').disabled=s.active||s.boardBusy;$('abort').disabled=!s.active;
+    if(!initialized){['engine','host','port','moveMs','input'].forEach(k=>$(k).value=s[k]);$('color').value=s.human;initialized=true;toggleEndpoint();}
+    options(s.options,s.active);
+    const signature=JSON.stringify(s.peers)+s.active+s.boardBusy;
+    if(signature!==peerSignature){peerSignature=signature;const frag=document.createDocumentFragment();s.peers.forEach(p=>{const b=document.createElement('button');b.textContent=p.name+' · '+p.address+' · '+p.rssi+' dBm';b.disabled=s.active||s.boardBusy;b.onclick=()=>post('connect',{index:p.index});frag.appendChild(b)});replaceContent($('peers'),frag);}
+  }catch(e){$('badge').textContent='ESP32 nicht erreichbar';$('connection').textContent='Mit dem WLAN espmame verbinden und die Seite erneut öffnen.';['new','abort','configure','scan'].forEach(id=>$(id).disabled=true);}
+}
+function toggleEndpoint(){$('endpoint').classList.toggle('hidden',$('engine').value!=='mame')}
+$('engine').onchange=toggleEndpoint;
+$('config').onsubmit=e=>{e.preventDefault();post('config',['engine','host','port','moveMs','input'].reduce((values,k)=>{values[k]=$(k).value;return values;},{}))};
+$('manual').onsubmit=async e=>{e.preventDefault();if(await post('move',{move:$('move').value.trim()}))$('move').value='';};
+$('new').onclick=()=>post('new',{color:$('color').value});
+$('abort').onclick=()=>post('abort');$('scan').onclick=()=>post('scan');
+$('flip').onclick=()=>{flipped=!flipped;draw(state?state.board:initial)};
+draw();
+async function poll(){await refresh();setTimeout(poll,750)}poll();
+</script>
+</html>

@@ -1,0 +1,29 @@
+// ---------------------------------------------------------------------------
+// ui/uicmd14.fh - Ersatz fuer die von MAMEs Bau erzeugte Datei.
+//
+// Im Original: Binaerdaten (BDC) der Schrift fuer die Zug-/Kommandoglyphen der
+// UI (aus src/emu/ui/uicmd14.bdf). Erzeugt MAMEs eigener Bauweg mit einem
+// bereits lauffaehigen MAME; im Quellbaum liegt die Datei nicht.
+//
+// Verwendung im Original (src/emu/rendfont.cpp:1602-1606):
+//     void render_font::render_font_command_glyph()
+//     {
+//         emu_file file(OPEN_FLAG_READ);
+//         if (file.open_ram(font_uicmd14, sizeof(font_uicmd14)) == osd_file::error::NONE)
+//             ... bdc_header lesen ...
+//
+// Folge der leeren Ersatzdatei: der BDC-Kopf laesst sich nicht lesen, die
+// Funktion kehrt sofort zurueck (nur eine Warnung im Protokoll). Diese Schrift
+// wird ausschliesslich fuer Kommandoglyphen in der UI gebraucht - auf dem S3
+// gibt es keine UI (docs/09).
+// ---------------------------------------------------------------------------
+
+#pragma once
+
+#include <cstdint>
+
+extern uint8_t const font_uicmd14[];
+uint8_t const font_uicmd14[] =
+{
+	0x00        // kein BDC-Inhalt -> render_font_command_glyph() kehrt sofort zurueck
+};

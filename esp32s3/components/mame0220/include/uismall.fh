@@ -1,0 +1,35 @@
+// ---------------------------------------------------------------------------
+// uismall.fh - Ersatz fuer die von MAMEs Bau erzeugte Datei.
+//
+// Im Original enthaelt diese Datei die Binaerdaten der eingebauten
+// UI-Schrift im BDC-Format (aus src/emu/ui/uismall.bdf). Erzeugt wird sie von
+// MAMEs eigenem Bauweg, der dafuer ein bereits lauffaehiges MAME braucht
+// ("-uifont"/render_font::save_cached). In unserem Bau gibt es diesen Schritt
+// nicht und die Datei ist im Quellbaum auch nicht vorhanden.
+//
+// Verwendung im Original (src/emu/rendfont.cpp:600-602):
+//     emu_file ramfile(OPEN_FLAG_READ);
+//     osd_file::error const filerr(ramfile.open_ram(font_uismall, sizeof(font_uismall)));
+//     if (osd_file::error::NONE == filerr)
+//         load_cached(ramfile, 0, 0);
+//
+// Folge der leeren Ersatzdatei: render_font::load_cached() bricht beim Pruefen
+// des BDC-Kopfes ab und meldet das ueber osd_printf_warning. Die eingebaute
+// Schrift hat dann keine Glyphen - auf dem ESP32-S3 wird aber keine
+// Bildschirmausgabe und keine UI gezeichnet (docs/09, "keine Grafikausgabe").
+// Der Emulationskern laeuft davon unbeeinflusst weiter.
+//
+// Sobald jemand die echte Schrift braucht (z. B. fuer eine spaetere
+// Textausgabe), ist sie mit einem Hostbau von MAME 0.220 aus
+// src/emu/ui/uismall.bdf zu erzeugen und hier einzusetzen.
+// ---------------------------------------------------------------------------
+
+#pragma once
+
+#include <cstdint>
+
+extern uint8_t const font_uismall[];
+uint8_t const font_uismall[] =
+{
+	0x00        // kein BDC-Inhalt -> load_cached() bricht kontrolliert ab
+};

@@ -1,0 +1,24 @@
+{
+  "origin": "C:\\Users\\DirkSommerfeld\\Documents\\CB-Emu\\MessChess\\plugins\\chessengine",
+  "upstream_author": "Sandro Ronco & Franz Huber",
+  "upstream_license": "BSD-3-Clause (init.lua metadata)",
+  "original_init_sha256": "a754eadfe0ccfef21c67a5c5fb8522fef2fd2007ee7fff774db96c6784b62542",
+  "payload": {
+    "bridge": {
+      "bytes": 26457,
+      "sha256": "c06028e362150c34ef91a0d3f851eacb4267113b4f4dcc5eb7ba97eb66184252"
+    },
+    "bootstrap": {
+      "bytes": 1559,
+      "sha256": "d0fe98d6feb2c1eecab30b784a4fe16d218c0bef036e487a6fcb68a687dfed5b"
+    },
+    "mm4": {
+      "bytes": 4935,
+      "sha256": "38ea27b1046aec95f72b921aa30eccf0cedd37c12e29c9134f6dd4219cba3200"
+    },
+    "mm5": {
+      "bytes": 29,
+      "sha256": "2de08c3e03e51b5928c3aeeb1e5bd840d9e70906e3237888fcaa19b2a00130cc"
+    }
+  }
+}
