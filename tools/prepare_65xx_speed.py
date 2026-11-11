@@ -16,7 +16,7 @@ def prepare(source, destination):
 #include <atomic>
 
 namespace {
-std::atomic<unsigned> s3_speed_mode{0};
+std::atomic<unsigned> s3_speed_mode{1};
 int64_t s3_cpu_us = 0;
 uint64_t s3_cpu_calls = 0, s3_cpu_cycles = 0;
 struct s3_execution_scope {
@@ -48,17 +48,30 @@ extern "C" void s3_m6502_profile_report(int64_t elapsed) {
     marker = signature + '\n{'
     assert text.count(marker) == 1
     text = text.replace(marker, marker + '\n\ts3_execution_scope profile_scope(icount);')
-    anchor = '\tmintf = std::make_unique<owned_memory_interface>();'
-    assert text.count(anchor) == 1
-    text = text.replace(anchor, '''    class cached_memory_interface final : public mi_default {
+    text = replace_body(text, 'void m6502_device::device_start()', '''    class owned_memory_interface final : public mi_default {
     public:
+        owned_memory_interface() { cache = nullptr; scache = nullptr; }
+        ~owned_memory_interface() override { delete cache; delete scache; }
+    };
+    class cached_memory_interface final : public mi_default {
+    public:
+        std::unique_ptr<memory_access_cache<0, 0, ENDIANNESS_LITTLE>> data_cache;
         cached_memory_interface() { cache = nullptr; scache = nullptr; }
         ~cached_memory_interface() override { delete cache; delete scache; }
-        uint8_t read(uint16_t adr) override { return cache->read_byte(adr); }
-        void write(uint16_t adr, uint8_t val) override { cache->write_byte(adr, val); }
+        uint8_t read(uint16_t adr) override { return data_cache->read_byte(adr); }
+        void write(uint16_t adr, uint8_t val) override { data_cache->write_byte(adr, val); }
     };
     if (s3_speed_mode.load() & 1) mintf = std::make_unique<cached_memory_interface>();
-    else mintf = std::make_unique<owned_memory_interface>();''')
+    else mintf = std::make_unique<owned_memory_interface>();
+    init();
+    // Upstream init registers state/caches but does not execute the CPU.
+    // Initialize this independent lookup cache before reset/execution starts.
+    if (s3_speed_mode.load() & 1) {
+        auto &intf = static_cast<cached_memory_interface &>(*mintf);
+        intf.data_cache.reset(intf.program->cache<0, 0, ENDIANNESS_LITTLE>());
+        std::printf("[MAME DATA CACHE] data=%p operand=%p opcode=%p bytes=%u\\n",
+            intf.data_cache.get(), intf.cache, intf.scache, unsigned(sizeof(*intf.data_cache)));
+    }''')
     anchor = '\tmintf->scache = mintf->sprogram->cache<0, 0, ENDIANNESS_LITTLE>();'
     assert text.count(anchor) == 1
     text = text.replace(anchor, anchor + '''
