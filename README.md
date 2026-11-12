@@ -3,6 +3,8 @@
 MAME/MESS 0.220 for ESP32-S3, with a cooperative Lua/UCI bridge and the Bauerino frontend.
 Target: **Waveshare ESP32-S3-Touch-AMOLED-2.16**, 480 x 480, 16 MiB flash and 8 MiB Octal PSRAM.
 
+**Resume here:** [Gesicherter Stand, Ergebnisse und nächste Ideen](docs/42_weiterarbeit_und_ideen.md).
+
 ## Verified development snapshot - 12 November 2026
 
 - Combined Build 53 combines direct qualified memory pages, bounded CPU/shared-memory IRAM and reduced sample generation for discarded DAC audio, with the startup animation, launcher, Virginia, Bots, Wi-Fi portal and web frontend. Retro runs in the same application without a reboot.
