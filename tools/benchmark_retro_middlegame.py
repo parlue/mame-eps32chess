@@ -19,8 +19,11 @@ p.add_argument('--expect-opcode-profile',action='store_true',help='Require diagn
 p.add_argument('--expect-core-profile',action='store_true',help='Require diagnostic nested core scopes; resulting speed is not a candidate speed measurement')
 p.add_argument('--expect-quiet-dac',action='store_true',help='Require 11025-Hz discarded DAC audio and the original MM IV/V CPU clock/update period')
 p.add_argument('--expect-hot-metadata',action='store_true',help='Require the bounded internal metadata experiment at ROM startup')
+p.add_argument('--expect-flat-pages',action='store_true',help='Require direct page pointers, bank invalidation self-test and no later invalidation')
+p.add_argument('--expect-flat-postload',action='store_true',help='Also require the post-load invalidation registration')
 a=p.parse_args()
 assert not (a.expect_opcode_profile and a.expect_core_profile), 'Use one diagnostic at a time'
+assert not a.expect_flat_postload or a.expect_flat_pages, 'Post-load check requires direct pages'
 if a.seconds<60:p.error('Use at least 60 wall seconds')
 if not re.fullmatch(r'(le [0-9]|bl [1-8])',a.level):p.error('Invalid device level')
 root=Path(__file__).resolve().parents[1]
@@ -91,6 +94,13 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         assert bool(metadata) == a.expect_hot_metadata, 'Wrong metadata placement profile'
         if a.expect_hot_metadata:
             assert len(metadata) == 2 and all(re.search(r'pages=8 bytes=200 internal=1', s) for s in metadata), 'Metadata self-test/rebuild not verified'
+        flat = [(i,s) for i,(_,s) in enumerate(events) if '[MAME FLAT PAGES]' in s]
+        assert bool(flat) == a.expect_flat_pages, 'Wrong direct-page profile'
+        if a.expect_flat_pages:
+            assert len(flat) == 3 and all('pointer_bytes=4 bank_changes=fallback' in s for _,s in flat), 'Direct-page helper lifecycle not verified'
+            assert any('[MAME FLAT BANK TEST] set_base=OK invalidation=OK fallback=OK' in s for _,s in events), 'Missing bank invalidation test'
+            restored = any('[MAME FLAT RESTORE] postload_registered=1' in s for _,s in events)
+            assert restored == a.expect_flat_postload, 'Wrong post-load invalidation profile'
         if a.expect_quiet_dac:
             startup = '\n'.join(s for _,s in events)
             rate = re.search(r'\[MAME QUIET DAC\] original=192000 requested=11025 cpu_clock=(\d+) timer_attoseconds=(\d+)', startup)
@@ -130,6 +140,8 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         assert has_opcode_profile==a.expect_opcode_profile, 'Opcode instrumentation does not match requested measurement kind'
         has_core_profile=any('[MAME CORE]' in s for t,s in events if search+10<=t<=end)
         assert has_core_profile==a.expect_core_profile, 'Core instrumentation does not match requested measurement kind'
+        if a.expect_flat_pages:
+            assert not any('[MAME FAST MEMORY] invalidated' in s for _,s in events[flat[-1][0]+1:]), 'Direct pages invalidated during ROM replay/search'
         quit_index=uci('quit');wait_since(r'^\[RETRO\] exit 0; integrity=OK',quit_index,90);loaded=False
         tap(30,25)
         elapsed=sum(w['real'] for w in windows);emulated=sum(w['emu'] for w in windows)
@@ -137,6 +149,8 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
             'measurement_kind':'instrumented-core-profile' if a.expect_core_profile else ('instrumented-opcode-profile' if a.expect_opcode_profile else 'sustained-speed'),
             'quiet_dac_contract_verified':a.expect_quiet_dac,
             'hot_metadata_verified':a.expect_hot_metadata,
+            'flat_pages_verified':a.expect_flat_pages,
+            'flat_postload_verified':a.expect_flat_postload,
             'search_wall_seconds':round(end-search,3),'bestmove':reply,'search_windows':windows,
             'measured_wall_seconds':elapsed,'measured_emulated_seconds':emulated,
             'weighted_original_speed_percent':100*emulated/elapsed,

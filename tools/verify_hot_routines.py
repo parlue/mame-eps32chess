@@ -56,6 +56,8 @@ if __name__ == '__main__':
     parser.add_argument('--hot-direct', action='store_true', help='Require the bounded inline-memory experiment marker')
     parser.add_argument('--hot-memory', action='store_true', help='Require four shared-memory methods in IRAM')
     parser.add_argument('--hot-metadata', action='store_true', help='Require the opt-in low-page metadata profile')
+    parser.add_argument('--flat-pages', action='store_true', help='Require direct qualified page pointers and bank change hooks')
+    parser.add_argument('--flat-postload', action='store_true', help='Require post-load invalidation registration')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     plan = json.loads((root / 'tools/65xx_hot_routines.json').read_text())
@@ -83,9 +85,13 @@ if __name__ == '__main__':
     assert b'[MAME OPCODE COUNTS]' not in binary and b'[MAME DIRECT MEMORY]' not in binary, 'Diagnostic/other experimental path still present'
     assert (b'[MAME HOT DIRECT]' in binary) == args.hot_direct, 'Wrong inline-memory profile in application'
     assert (b'[MAME HOT METADATA]' in binary) == args.hot_metadata, 'Wrong metadata placement profile in application'
+    assert (b'[MAME FLAT PAGES]' in binary) == args.flat_pages, 'Wrong direct-page profile in application'
+    assert (b'[MAME FLAT RESTORE]' in binary) == args.flat_postload, 'Wrong post-load profile in application'
     result = {'extra_shared_sram_bytes': extra, 'extra_iram_reserved_bytes': iram_extra,
               'budget_bytes': plan['extra_iram_budget_bytes'], 'selected': selected, 'shared_memory': memory,
               'hot_metadata': args.hot_metadata,
+              'flat_pages': args.flat_pages,
+              'flat_postload': args.flat_postload,
               'note': 'Function text plus literal/alignment cost is bounded by actual linker SRAM reservation; runtime heap still requires device validation.'}
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))

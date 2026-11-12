@@ -1,5 +1,10 @@
 # Bounded low-page metadata experiment
 
+Historical experiment and restoration of Build 48. With the later direct-page
+default, select `BAUERINO_MAME_FLAT_PAGES=0` for its reference path. Explicit
+`HOT_METADATA=1` automatically keeps the incompatible direct-page path off.
+Device-state statements below describe the end of this rejected experiment.
+
 Reference: adopted Build 48, with shared memory entry points in IRAM and quiet
 DAC output. Its matched middlegames achieved 30.789% (MM IV, Spanish centre)
 and 32.684% (MM V, Dragon attack) of original speed. This experiment is opt-in

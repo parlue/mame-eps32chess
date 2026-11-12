@@ -1,5 +1,9 @@
 # Shared memory entry points in IRAM
 
+Historical qualification of Builds 46–48. With the later direct-page default,
+set `BAUERINO_MAME_FLAT_PAGES=0` to select the bank-base-per-access path measured
+here. This flag is independent of the retained shared-method IRAM placement.
+
 The immediate reference is adopted Build 44/45, including quiet DAC audio:
 MM IV 30.190% and MM V 32.106% original speed in the established 32-ply
 middlegames. Original CPU clocks and timer periods remain the reference.

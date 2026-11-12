@@ -1,8 +1,8 @@
 #pragma once
 
 // Only plain upstream fixed-memory or bank handlers qualify. Other handlers remain
-// on MAME's normal path. Bank::base() is re-read on every access, so set_entry
-// and set_base remain visible even without an address-space change notification.
+// on MAME's normal path. Normally bank bases are re-read on every access; the
+// flat-page profile instead invalidates before bank mutation and after restore.
 #include "emumem_hea.h"
 #include "emumem_hem.h"
 #include <array>
@@ -17,10 +17,17 @@ class s3_fast_memory {
     using read_bank = handler_entry_read_memory_bank<0, 0, ENDIANNESS_LITTLE>;
     using write_bank = handler_entry_write_memory_bank<0, 0, ENDIANNESS_LITTLE>;
     struct page {
+#ifdef BAUERINO_MAME_FLAT_PAGES
+        u8 *fixed = nullptr;
+        u8 *base() const { return fixed; }
+        u8 *pointer(u16 address) const { return fixed ? fixed + (address & 255) : nullptr; }
+#else
         memory_bank *bank = nullptr;
         u8 *fixed = nullptr;
         u32 offset = 0;
         u8 *base() const { return bank ? static_cast<u8 *>(bank->base()) : fixed; }
+        u8 *pointer(u16 address) const { auto *b = base(); return b ? b + offset + (address & 255) : nullptr; }
+#endif
     };
     using table = std::array<page, 256>;
     address_space &m_program, &m_opcodes;
@@ -28,6 +35,11 @@ class s3_fast_memory {
     std::unique_ptr<table> m_opcode_reads;
     int m_program_notifier = -1, m_opcode_notifier = -1;
     bool m_valid = false;
+#ifdef BAUERINO_MAME_FLAT_PAGES
+    inline static s3_fast_memory *s_bank_clients = nullptr;
+    s3_fast_memory *m_next_bank_client = nullptr;
+    static_assert(sizeof(page) == sizeof(u8 *), "One direct pointer per page");
+#endif
 
 #ifdef BAUERINO_MAME_HOT_METADATA
     // One bounded slot, owned by at most one helper on the MAME worker. Entries
@@ -82,7 +94,13 @@ class s3_fast_memory {
                 bool contiguous = true;
                 for (u32 i = 1; i < 256; ++i)
                     if (reinterpret_cast<uintptr_t>(handler->get_ptr(address + i)) != first + i) { contiguous = false; break; }
-                if (contiguous) pages[address >> 8] = page{bank, fixed ? reinterpret_cast<u8 *>(first) : nullptr, u32(first - base)};
+                if (contiguous) {
+#ifdef BAUERINO_MAME_FLAT_PAGES
+                    pages[address >> 8] = page{reinterpret_cast<u8 *>(first)};
+#else
+                    pages[address >> 8] = page{bank, fixed ? reinterpret_cast<u8 *>(first) : nullptr, u32(first - base)};
+#endif
+                }
             }
         }
     }
@@ -105,16 +123,21 @@ class s3_fast_memory {
 #ifdef BAUERINO_MAME_HOT_METADATA
         if (address < 0x800 && &pages == &m_reads && hot().owner == this && hot().valid) {
             const auto &p = hot().reads[address >> 8];
-            if (auto *base = p.base()) return base[p.offset + (address & 255)];
+            if (auto *value = p.pointer(address)) return *value;
         }
 #endif
         if (m_valid) {
             const auto &p = pages[address >> 8];
-            if (auto *base = p.base()) return base[p.offset + (address & 255)];
+            if (auto *value = p.pointer(address)) return *value;
         }
         return fallback.read_byte(address);
     }
 public:
+#ifdef BAUERINO_MAME_FLAT_PAGES
+    static void banks_changed() {
+        for (auto *p = s_bank_clients; p; p = p->m_next_bank_client) p->invalidate();
+    }
+#endif
     s3_fast_memory(address_space &program, address_space &opcodes) : m_program(program), m_opcodes(opcodes) {
         build(program, m_reads, &m_writes);
         if (&program != &opcodes) {
@@ -129,16 +152,26 @@ public:
             throw;
         }
         m_valid = true;
+#ifdef BAUERINO_MAME_FLAT_PAGES
+        m_next_bank_client = s_bank_clients;
+        s_bank_clients = this;
+        std::printf("[MAME FLAT PAGES] pointer_bytes=%u bank_changes=fallback\n", unsigned(sizeof(page)));
+#endif
 #ifdef BAUERINO_MAME_HOT_METADATA
         claim_hot();
 #endif
         unsigned reads = 0, writes = 0;
-        for (const auto &p : m_reads) reads += bool(p.bank || p.fixed);
-        for (const auto &p : m_writes) writes += bool(p.bank || p.fixed);
+        for (const auto &p : m_reads) reads += bool(p.base());
+        for (const auto &p : m_writes) writes += bool(p.base());
         std::printf("[MAME FAST MEMORY] read_pages=%u write_pages=%u bytes=%u opcode_shared=%d\n",
             reads, writes, unsigned(sizeof(*this) + (m_opcode_reads ? sizeof(table) : 0)), int(&program == &opcodes));
     }
     ~s3_fast_memory() {
+#ifdef BAUERINO_MAME_FLAT_PAGES
+        auto **link = &s_bank_clients;
+        while (*link && *link != this) link = &(*link)->m_next_bank_client;
+        if (*link) *link = m_next_bank_client;
+#endif
 #ifdef BAUERINO_MAME_HOT_METADATA
         if (hot().owner == this) { hot().valid = false; hot().owner = nullptr; }
 #endif
@@ -151,8 +184,7 @@ public:
     const u8 *probe_read_pointer(u16 address) const {
         if (!m_valid) return nullptr;
         const auto &p = m_reads[address >> 8];
-        auto *base = p.base();
-        return base ? base + p.offset + (address & 255) : nullptr;
+        return p.pointer(address);
     }
     u8 read(u16 address, cache_type &fallback) const { return read_from(m_reads, address, fallback); }
     u8 opcode(u16 address, cache_type &fallback) const { return read_from(m_opcode_reads ? *m_opcode_reads : m_reads, address, fallback); }
@@ -160,12 +192,12 @@ public:
 #ifdef BAUERINO_MAME_HOT_METADATA
         if (address < 0x800 && hot().owner == this && hot().valid) {
             const auto &p = hot().writes[address >> 8];
-            if (auto *base = p.base()) { base[p.offset + (address & 255)] = value; return; }
+            if (auto *target = p.pointer(address)) { *target = value; return; }
         }
 #endif
         if (m_valid) {
             const auto &p = m_writes[address >> 8];
-            if (auto *base = p.base()) { base[p.offset + (address & 255)] = value; return; }
+            if (auto *target = p.pointer(address)) { *target = value; return; }
         }
         fallback.write_byte(address, value);
     }
@@ -176,14 +208,14 @@ public:
         unsigned checked = 0;
         int scratch = -1;
         for (unsigned i = 0; i < 256; ++i) {
-            if (m_reads[i].bank || m_reads[i].fixed) for (unsigned j = 0; j < 256; ++j) {
+            if (m_reads[i].base()) for (unsigned j = 0; j < 256; ++j) {
                 const u16 address = u16((i << 8) | j);
                 if (read(address, data) != data.read_byte(address)) throw emu_fatalerror("Fast memory read self-test failed");
                 ++checked;
             }
-            const auto r = reinterpret_cast<uintptr_t>(m_reads[i].base());
-            const auto w = reinterpret_cast<uintptr_t>(m_writes[i].base());
-            if (r && w && r + m_reads[i].offset == w + m_writes[i].offset) {
+            const auto r = m_reads[i].pointer(u16(i << 8));
+            const auto w = m_writes[i].pointer(u16(i << 8));
+            if (r && r == w) {
 #ifdef BAUERINO_MAME_HOT_METADATA
                 // Exercise the internal slot's read/write and tap invalidation.
                 if (scratch < 0 && i < 8) scratch = (i << 8) | 255;
@@ -208,6 +240,27 @@ public:
         const u8 observed = read(address, data);
         tap->remove();
         if (!invalidated || hits != 1 || observed != saved) throw emu_fatalerror("Fast memory tap fallback self-test failed");
+#ifdef BAUERINO_MAME_FLAT_PAGES
+        // A distinct fresh helper proves bank notification independently of
+        // the map/tap test above; no guest data or bank selection is changed.
+        auto observer = std::make_unique<s3_fast_memory>(m_program, m_opcodes);
+        bool bank_test = false;
+        for (const auto &item : m_program.device().machine().memory().banks()) {
+            auto &bank = *item.second;
+            if (bank.references_space(m_program, read_or_write::READWRITE) && bank.base()) {
+                bank.set_base(bank.base());
+                if (observer->m_valid || observer->read(address, data) != saved)
+                    throw emu_fatalerror("Flat pages bank notification self-test failed");
+                bank_test = true;
+                break;
+            }
+        }
+        if (!bank_test) throw emu_fatalerror("No bank for flat pages notification self-test");
+        std::printf("[MAME FLAT BANK TEST] set_base=OK invalidation=OK fallback=OK\n");
+#endif
         std::printf("[MAME FAST TEST] bytes=%u read/write=OK invalidation/tap=OK restored=OK\n", checked);
     }
 };
+#ifdef BAUERINO_MAME_FLAT_PAGES
+extern "C" void s3_flat_bank_changed() { s3_fast_memory::banks_changed(); }
+#endif

@@ -42,6 +42,12 @@ hot_memory_default = hot_routines and not (hot_direct or direct_memory or memory
 hot_memory = os.environ.get('BAUERINO_MAME_HOT_MEMORY', '1' if hot_memory_default else '0') == '1'
 assert not hot_direct or hot_routines, 'Combined hot-direct experiment requires IRAM routines'
 assert not hot_memory or hot_routines, 'Shared-memory IRAM experiment requires IRAM routines'
+# Keep explicit older CPU/metadata experiments independent; coarse core timing
+# intentionally inherits the current qualified memory path.
+flat_default = hot_memory and not (hot_metadata or direct_memory or hot_direct or memory_probe or opcode_profile)
+flat_pages = os.environ.get('BAUERINO_MAME_FLAT_PAGES', '1' if flat_default else '0') == '1'
+assert not flat_pages or cpu_unity, 'Direct pages qualified only with CPU unity'
+assert not flat_pages or not (hot_metadata or direct_memory or hot_direct or memory_probe or opcode_profile), 'Measure flat pages separately'
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
     str(speed_base), str(speed_overlay)]
     + (['--memory-probe'] if memory_probe else [])
@@ -104,6 +110,10 @@ memory_roots = memory_base.with_name('emumem_roots_s3.cpp')
 if restricted_roots:
     subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_roots.py'),
         str(memory_base), str(memory_roots)], check=True)
+memory_flat = memory_base.with_name('emumem_flat_s3.cpp')
+if flat_pages:
+    subprocess.run([sys.executable, str(root / 'tools/prepare_flat_banks.py'),
+        str(memory_roots if restricted_roots else memory_base), str(memory_flat)], check=True)
 memory_sources = 0
 no_debug_commands = env.GetProjectOption('custom_mame_no_debug_commands', 'yes').lower() in ('yes', 'true', '1')
 debug_overlay = root / 'esp32s3/components/mame0220/generated/debugcmd_s3.cpp'
@@ -156,7 +166,7 @@ for entry in entries:
             media_selected += 1
             break
     if source.name in ('emumem_s3.cpp', 'emumem_roots_s3.cpp'):
-        source = memory_roots if restricted_roots else memory_base
+        source = memory_flat if flat_pages else (memory_roots if restricted_roots else memory_base)
         normalized = source.as_posix()
         memory_sources += 1
     if source.name in ('debugcmd.cpp', 'debugcmd_s3.cpp'):
@@ -228,6 +238,8 @@ for entry in entries:
         core.Append(CCFLAGS=['-O2', '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
         if hot_metadata:
             core.Append(CPPDEFINES=['BAUERINO_MAME_HOT_METADATA'])
+        if flat_pages:
+            core.Append(CPPDEFINES=['BAUERINO_MAME_FLAT_PAGES'])
         if os.environ.get('BAUERINO_MAME_CPU_ASM') == '1':
             core.Append(CCFLAGS=['-save-temps=obj'])
     key = hashlib.sha256(normalized.encode()).hexdigest()[:12]
