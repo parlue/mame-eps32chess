@@ -4,7 +4,7 @@ import re
 from prepare_direct_memory import write_changed
 
 
-def prepare(base_text, destination, direct=False):
+def prepare(base_text, destination, direct=False, memory=False):
     generated = destination.parent.resolve()
     component = generated.parent
     root = component.parents[2]
@@ -33,6 +33,20 @@ def prepare(base_text, destination, direct=False):
         return text
 
     base_text = annotate(rewrite(base_text))
+    if memory:
+        start = base_text.index('    class paged_memory_interface final : public cached_memory_interface {')
+        end = base_text.index('\n    };', start)
+        original = base_text[start:end]
+        changed = original
+        for signature in ('uint8_t read(uint16_t adr) override',
+                          'void write(uint16_t adr, uint8_t val) override',
+                          'uint8_t read_arg(uint16_t adr) override',
+                          'uint8_t read_sync(uint16_t adr) override'):
+            assert changed.count(signature) == 1, signature
+            changed = changed.replace(signature, marker + signature)
+        assert changed.replace(marker, '') == original, 'Memory bodies must remain unchanged'
+        base_text = base_text[:start] + changed + base_text[end:]
+        print('IRAM placement overlay: four shared paged-memory methods; bodies unchanged')
     base_text = base_text.replace('#include "../src/s3_fast_memory.h"',
                                   '#include "../src/s3_fast_memory.h"\n#include "esp_attr.h"')
     for name in ('m6502', 'm65c02'):

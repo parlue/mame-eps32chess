@@ -35,13 +35,18 @@ quiet_dac_selected = 0
 # non-unity comparisons retain their original CPU unless explicitly requested.
 hot_default = cpu_unity and not (direct_memory or memory_probe or opcode_profile)
 hot_routines = os.environ.get('BAUERINO_MAME_HOT_ROUTINES', '1' if hot_default else '0') == '1'
+# Keep explicit legacy/diagnostic CPU profiles independent of the new default.
+hot_memory_default = hot_routines and not (hot_direct or direct_memory or memory_probe or opcode_profile)
+hot_memory = os.environ.get('BAUERINO_MAME_HOT_MEMORY', '1' if hot_memory_default else '0') == '1'
 assert not hot_direct or hot_routines, 'Combined hot-direct experiment requires IRAM routines'
+assert not hot_memory or hot_routines, 'Shared-memory IRAM experiment requires IRAM routines'
 subprocess.run([sys.executable, str(root / 'tools/prepare_65xx_speed.py'),
     str(speed_base), str(speed_overlay)]
     + (['--memory-probe'] if memory_probe else [])
     + (['--opcode-profile'] if opcode_profile else [])
-    + (['--hot-routines'] if hot_routines and not hot_direct else [])
+    + (['--hot-routines'] if hot_routines and not (hot_direct or hot_memory) else [])
     + (['--hot-direct'] if hot_direct else [])
+    + (['--hot-memory'] if hot_memory else [])
     + (['--direct-memory'] if direct_memory else []), check=True)
 speed_selected = 0
 cpu_source = speed_overlay

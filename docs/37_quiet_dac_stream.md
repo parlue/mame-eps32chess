@@ -1,5 +1,8 @@
 # Quiet DAC stream-rate profile
 
+Builds 44/45 below predate shared-memory IRAM adoption. To reproduce this
+isolated baseline after Build 48, set `BAUERINO_MAME_HOT_MEMORY=0`.
+
 The coarse core diagnostic in Build 41 attributed 13.500% / 14.352% of MM IV/V
 middlegame wall time to sound-manager updates. Skipping final stereo conversion
 is a separate, still optional experiment. This profile instead addresses the

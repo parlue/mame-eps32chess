@@ -3,8 +3,9 @@
 The adopted baseline is the exact Build 38/40 IRAM application: MM IV 26.525%
 and MM V 28.012% original speed in the established 32-ply middlegames. The
 bounded inline-access experiment remains disabled.
-To reproduce Builds 41/42 after the later quiet-DAC adoption, explicitly set
-`BAUERINO_MAME_QUIET_DAC=0`; otherwise diagnostics inherit the current default.
+To reproduce Builds 41/42 after the later quiet-DAC/shared-memory adoption,
+explicitly set `BAUERINO_MAME_QUIET_DAC=0` and `BAUERINO_MAME_HOT_MEMORY=0`;
+otherwise diagnostics inherit the current default.
 
 ## Diagnostic profile
 
