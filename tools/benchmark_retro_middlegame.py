@@ -18,6 +18,7 @@ p.add_argument('--output',type=Path,required=True)
 p.add_argument('--expect-opcode-profile',action='store_true',help='Require diagnostic histograms; resulting speed is instrumented and not comparable')
 p.add_argument('--expect-core-profile',action='store_true',help='Require diagnostic nested core scopes; resulting speed is not a candidate speed measurement')
 p.add_argument('--expect-quiet-dac',action='store_true',help='Require 11025-Hz discarded DAC audio and the original MM IV/V CPU clock/update period')
+p.add_argument('--expect-hot-metadata',action='store_true',help='Require the bounded internal metadata experiment at ROM startup')
 a=p.parse_args()
 assert not (a.expect_opcode_profile and a.expect_core_profile), 'Use one diagnostic at a time'
 if a.seconds<60:p.error('Use at least 60 wall seconds')
@@ -86,6 +87,10 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         send('x'*1030+'tap 100 320');wait(r'^\[DIAGNOSTIC\] rejected: input line too long$')
         tap(100,320);tap(300,340);tap(240,150 if a.driver=='mm4' else 250)
         loaded=True;wait(r'^\[RETRO OPEN\] '+a.driver);wait(r'^\[RETRO UCI\] readyok$')
+        metadata = [s for _,s in events if '[MAME HOT METADATA]' in s]
+        assert bool(metadata) == a.expect_hot_metadata, 'Wrong metadata placement profile'
+        if a.expect_hot_metadata:
+            assert len(metadata) == 2 and all(re.search(r'pages=8 bytes=200 internal=1', s) for s in metadata), 'Metadata self-test/rebuild not verified'
         if a.expect_quiet_dac:
             startup = '\n'.join(s for _,s in events)
             rate = re.search(r'\[MAME QUIET DAC\] original=192000 requested=11025 cpu_clock=(\d+) timer_attoseconds=(\d+)', startup)
@@ -131,6 +136,7 @@ with serial.Serial(a.port,115200,timeout=.2) as usb,(a.output/'device.log').open
         evidence={'driver':a.driver,'case':a.case,'level':a.level,'position':position,
             'measurement_kind':'instrumented-core-profile' if a.expect_core_profile else ('instrumented-opcode-profile' if a.expect_opcode_profile else 'sustained-speed'),
             'quiet_dac_contract_verified':a.expect_quiet_dac,
+            'hot_metadata_verified':a.expect_hot_metadata,
             'search_wall_seconds':round(end-search,3),'bestmove':reply,'search_windows':windows,
             'measured_wall_seconds':elapsed,'measured_emulated_seconds':emulated,
             'weighted_original_speed_percent':100*emulated/elapsed,

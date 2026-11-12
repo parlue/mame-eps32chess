@@ -25,6 +25,8 @@ discard_mix = os.environ.get('BAUERINO_MAME_DISCARD_MIX') == '1'
 # The discarded-audio profile retains the original ROM clocks and timers.
 # Explicit 0 restores the original DAC sample rate for controlled comparisons.
 quiet_dac = os.environ.get('BAUERINO_MAME_QUIET_DAC', '1') == '1'
+hot_metadata = os.environ.get('BAUERINO_MAME_HOT_METADATA') == '1'
+assert not hot_metadata or not (direct_memory or hot_direct or memory_probe or opcode_profile or core_profile), 'Measure metadata placement separately'
 assert not core_profile or not (direct_memory or hot_direct or memory_probe or opcode_profile), 'Measure the adopted CPU profile separately'
 cpu_unity = env.GetProjectOption('custom_mame_cpu_unity', 'yes').lower() in ('yes', 'true', '1')
 assert not core_profile or cpu_unity, 'Core diagnostic qualified only with CPU unity'
@@ -224,6 +226,8 @@ for entry in entries:
         core = core.Clone()
         core.ProcessUnFlags('-Os -O1 -O2 -O3 -fno-jump-tables -fno-tree-switch-conversion')
         core.Append(CCFLAGS=['-O2', '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
+        if hot_metadata:
+            core.Append(CPPDEFINES=['BAUERINO_MAME_HOT_METADATA'])
         if os.environ.get('BAUERINO_MAME_CPU_ASM') == '1':
             core.Append(CCFLAGS=['-save-temps=obj'])
     key = hashlib.sha256(normalized.encode()).hexdigest()[:12]

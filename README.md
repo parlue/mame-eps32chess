@@ -72,6 +72,7 @@ This is the tested development source snapshot. The combined build still uses th
 - [Exclusive core timing and final conversion experiment](docs/36_core_profile_discarded_mix.md)
 - [Adopted quiet DAC stream profile](docs/37_quiet_dac_stream.md)
 - [Adopted shared-memory IRAM placement](docs/38_shared_memory_iram.md)
+- [Rejected low-page metadata SRAM experiment](docs/39_hot_page_metadata.md): about 9.5% slower in both matched middlegames; remains opt-in and the qualified Build-48 firmware is restored.
 - [Lua/UCI bridge](integration/chessengine/README.md)
 
 Older documents describe historical intermediate states. Use the later build/test records for current acceptance.

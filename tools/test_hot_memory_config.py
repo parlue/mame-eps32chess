@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = {'direct_memory', 'hot_direct', 'hot_memory', 'hot_memory_default',
          'memory_probe', 'opcode_profile', 'core_profile', 'quiet_dac',
-         'cpu_unity', 'hot_default', 'hot_routines'}
+         'cpu_unity', 'hot_default', 'hot_routines', 'hot_metadata'}
 nodes = []
 for node in ast.parse((ROOT / 'bauerino/mame_build.py').read_text()).body:
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
@@ -29,6 +29,13 @@ def config(flags=None, unity='yes'):
 
 
 class HotMemoryConfigTests(unittest.TestCase):
+    def test_metadata_is_opt_in_and_excludes_other_experiments(self):
+        self.assertFalse(config()['hot_metadata'])
+        self.assertTrue(config({'BAUERINO_MAME_HOT_METADATA': '1'})['hot_metadata'])
+        for other in ('DIRECT_MEMORY', 'HOT_DIRECT', 'MEMORY_PROBE', 'OPCODE_PROFILE', 'CORE_PROFILE'):
+            with self.subTest(other=other), self.assertRaises(AssertionError):
+                config({'BAUERINO_MAME_HOT_METADATA': '1', 'BAUERINO_MAME_' + other: '1'})
+
     def test_default_and_explicit_memory_off(self):
         self.assertTrue(config()['hot_memory'])
         disabled = config({'BAUERINO_MAME_HOT_MEMORY': '0'})

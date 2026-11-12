@@ -7,6 +7,10 @@
 #include "emumem_hem.h"
 #include <array>
 #include <cstdint>
+#ifdef BAUERINO_MAME_HOT_METADATA
+#include "esp_attr.h"
+#include "esp_memory_utils.h"
+#endif
 
 class s3_fast_memory {
     using cache_type = memory_access_cache<0, 0, ENDIANNESS_LITTLE>;
@@ -24,6 +28,31 @@ class s3_fast_memory {
     std::unique_ptr<table> m_opcode_reads;
     int m_program_notifier = -1, m_opcode_notifier = -1;
     bool m_valid = false;
+
+#ifdef BAUERINO_MAME_HOT_METADATA
+    // One bounded slot, owned by at most one helper on the MAME worker. Entries
+    // retain bank pointers (never snapshot bank bases or actual guest RAM).
+    struct hot_state {
+        const s3_fast_memory *owner;
+        bool valid;
+        std::array<page, 8> reads, writes;
+    };
+    static hot_state &hot() {
+        static DRAM_ATTR hot_state state{};
+        static_assert(sizeof(state) <= 208, "Bounded internal metadata slot");
+        return state;
+    }
+    void claim_hot() {
+        auto &h = hot();
+        if (h.owner) return; // Additional CPUs/helpers retain the original path.
+        if (!esp_ptr_internal(&h)) throw emu_fatalerror("Hot metadata outside internal SRAM");
+        std::copy_n(m_reads.begin(), h.reads.size(), h.reads.begin());
+        std::copy_n(m_writes.begin(), h.writes.size(), h.writes.begin());
+        h.valid = m_valid;
+        h.owner = this;
+        std::printf("[MAME HOT METADATA] pages=8 bytes=%u internal=1\n", unsigned(sizeof(h)));
+    }
+#endif
 
     static memory_bank *find_bank(address_space &space, const handler_entry &entry) {
         const auto name = entry.name();
@@ -66,10 +95,19 @@ class s3_fast_memory {
         if (writes) populate<write_bank>(space, write_map, *writes);
     }
     void invalidate() {
+#ifdef BAUERINO_MAME_HOT_METADATA
+        if (hot().owner == this) hot().valid = false;
+#endif
         if (m_valid) std::printf("[MAME FAST MEMORY] invalidated; normal MAME fallback\n");
         m_valid = false;
     }
     u8 read_from(const table &pages, u16 address, cache_type &fallback) const {
+#ifdef BAUERINO_MAME_HOT_METADATA
+        if (address < 0x800 && &pages == &m_reads && hot().owner == this && hot().valid) {
+            const auto &p = hot().reads[address >> 8];
+            if (auto *base = p.base()) return base[p.offset + (address & 255)];
+        }
+#endif
         if (m_valid) {
             const auto &p = pages[address >> 8];
             if (auto *base = p.base()) return base[p.offset + (address & 255)];
@@ -91,6 +129,9 @@ public:
             throw;
         }
         m_valid = true;
+#ifdef BAUERINO_MAME_HOT_METADATA
+        claim_hot();
+#endif
         unsigned reads = 0, writes = 0;
         for (const auto &p : m_reads) reads += bool(p.bank || p.fixed);
         for (const auto &p : m_writes) writes += bool(p.bank || p.fixed);
@@ -98,6 +139,9 @@ public:
             reads, writes, unsigned(sizeof(*this) + (m_opcode_reads ? sizeof(table) : 0)), int(&program == &opcodes));
     }
     ~s3_fast_memory() {
+#ifdef BAUERINO_MAME_HOT_METADATA
+        if (hot().owner == this) { hot().valid = false; hot().owner = nullptr; }
+#endif
         if (m_program_notifier >= 0) m_program.remove_change_notifier(m_program_notifier);
         if (m_opcode_notifier >= 0) m_opcodes.remove_change_notifier(m_opcode_notifier);
     }
@@ -113,6 +157,12 @@ public:
     u8 read(u16 address, cache_type &fallback) const { return read_from(m_reads, address, fallback); }
     u8 opcode(u16 address, cache_type &fallback) const { return read_from(m_opcode_reads ? *m_opcode_reads : m_reads, address, fallback); }
     void write(u16 address, u8 value, cache_type &fallback) const {
+#ifdef BAUERINO_MAME_HOT_METADATA
+        if (address < 0x800 && hot().owner == this && hot().valid) {
+            const auto &p = hot().writes[address >> 8];
+            if (auto *base = p.base()) { base[p.offset + (address & 255)] = value; return; }
+        }
+#endif
         if (m_valid) {
             const auto &p = m_writes[address >> 8];
             if (auto *base = p.base()) { base[p.offset + (address & 255)] = value; return; }
@@ -133,7 +183,14 @@ public:
             }
             const auto r = reinterpret_cast<uintptr_t>(m_reads[i].base());
             const auto w = reinterpret_cast<uintptr_t>(m_writes[i].base());
-            if (r && w && r + m_reads[i].offset == w + m_writes[i].offset) scratch = (i << 8) | 255;
+            if (r && w && r + m_reads[i].offset == w + m_writes[i].offset) {
+#ifdef BAUERINO_MAME_HOT_METADATA
+                // Exercise the internal slot's read/write and tap invalidation.
+                if (scratch < 0 && i < 8) scratch = (i << 8) | 255;
+#else
+                scratch = (i << 8) | 255;
+#endif
+            }
         }
         if (scratch < 0 || !checked) throw emu_fatalerror("Fast memory self-test found no RAM/ROM pages");
         const u16 address = u16(scratch);
