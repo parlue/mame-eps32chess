@@ -7,7 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = {'direct_memory', 'hot_direct', 'hot_memory', 'hot_memory_default',
          'memory_probe', 'opcode_profile', 'core_profile', 'quiet_dac',
-         'cpu_unity', 'hot_default', 'hot_routines', 'hot_metadata', 'flat_pages', 'flat_default'}
+         'cpu_unity', 'hot_default', 'hot_routines', 'hot_metadata', 'flat_pages', 'flat_default', 'cpu_opt'}
 nodes = []
 for node in ast.parse((ROOT / 'bauerino/mame_build.py').read_text()).body:
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
@@ -29,6 +29,13 @@ def config(flags=None, unity='yes'):
 
 
 class HotMemoryConfigTests(unittest.TestCase):
+    def test_cpu_optimization_is_bounded_and_default_unchanged(self):
+        self.assertEqual(config()['cpu_opt'],'O2')
+        self.assertEqual(config({'BAUERINO_MAME_CPU_OPT':'O3'})['cpu_opt'],'O3')
+        for value in ('Ofast','-O3','O2 -ffast-math',''):
+            with self.subTest(value=value),self.assertRaises(AssertionError):
+                config({'BAUERINO_MAME_CPU_OPT':value})
+
     def test_flat_pages_default_explicit_off_and_measured_alone(self):
         self.assertTrue(config()['flat_pages'])
         self.assertFalse(config({'BAUERINO_MAME_FLAT_PAGES':'0'})['flat_pages'])

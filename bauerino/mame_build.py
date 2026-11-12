@@ -21,6 +21,8 @@ hot_direct = os.environ.get('BAUERINO_MAME_HOT_DIRECT') == '1'
 memory_probe = os.environ.get('BAUERINO_MAME_MEMORY_PROBE') == '1'
 opcode_profile = os.environ.get('BAUERINO_MAME_OPCODE_PROFILE') == '1'
 core_profile = os.environ.get('BAUERINO_MAME_CORE_PROFILE') == '1'
+cpu_opt = os.environ.get('BAUERINO_MAME_CPU_OPT', 'O2')
+assert cpu_opt in ('O2', 'O3'), 'CPU optimization must be O2 or O3'
 discard_mix = os.environ.get('BAUERINO_MAME_DISCARD_MIX') == '1'
 # The discarded-audio profile retains the original ROM clocks and timers.
 # Explicit 0 restores the original DAC sample rate for controlled comparisons.
@@ -235,7 +237,7 @@ for entry in entries:
     if source.name in ('m6502_speed_s3.cpp', 'm6502_unity_s3.cpp', 'm65c02.cpp'):
         core = core.Clone()
         core.ProcessUnFlags('-Os -O1 -O2 -O3 -fno-jump-tables -fno-tree-switch-conversion')
-        core.Append(CCFLAGS=['-O2', '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
+        core.Append(CCFLAGS=['-' + cpu_opt, '-fjump-tables', '-ftree-switch-conversion', '-fno-merge-constants'])
         if hot_metadata:
             core.Append(CPPDEFINES=['BAUERINO_MAME_HOT_METADATA'])
         if flat_pages:
